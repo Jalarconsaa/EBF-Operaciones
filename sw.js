@@ -1,9 +1,8 @@
-const CACHE = 'ebf-ops-v1';
+// Subir el número de versión fuerza la limpieza de cachés antiguas
+const CACHE = 'ebf-ops-v2';
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['./index.html','./manifest.json']))
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./index.html','./manifest.json'])));
   self.skipWaiting();
 });
 
@@ -16,10 +15,17 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// Red primero: con internet siempre baja la versión nueva y la guarda.
+// Sin internet usa la copia guardada.
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() =>
-      caches.match('./index.html')
-    ))
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
   );
 });
