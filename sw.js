@@ -1,8 +1,8 @@
 // Subir el número de versión fuerza la limpieza de cachés antiguas
-const CACHE = 'ebf-ops-v3';
+const CACHE = 'ebf-ops-v4';
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'])));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./icon-512-maskable.png'])));
   self.skipWaiting();
 });
 
