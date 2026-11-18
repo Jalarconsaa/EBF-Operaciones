@@ -409,14 +409,7 @@ function buildPDFHtml(op){
   <div class="sec"><div class="st m">🗺 CROQUIS — DIVISIÓN DEL INCENDIO</div><div class="sb" style="padding:6px">${buildCroquisSVG(op.recursos_croquis)}</div></div>
   <div class="mando"><div><div class="ml">📤 Entrega el mando</div><div class="mn">${val(op.mando_entrega)}</div><div class="mf"></div><div style="font-size:6pt;opacity:.4;margin-top:2px">Firma / RUT</div></div><div><div class="ml">📥 Recibe el mando</div><div class="mn">${val(op.mando_recibe)}</div><div class="mf"></div><div style="font-size:6pt;opacity:.4;margin-top:2px">Firma / RUT</div></div></div>
   <div class="footer"><span>🧯 EBF Constitución</span><span>${new Date().toLocaleString('es-CL')}</span></div>
-  <script>
-if('serviceWorker' in navigator){
-  window.addEventListener('load',function(){
-    navigator.serviceWorker.register('./sw.js').catch(function(e){console.log('SW error',e)});
-  });
-}
-</script>
-</body></html>`;
+  </body></html>`;
 }
 
 function imprimirPDF(op){
@@ -581,5 +574,12 @@ function App(){
   </div>
 }
 ReactDOM.createRoot(document.getElementById('app')).render(<App/>);
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('./sw.js').catch(function(e){console.log('SW error',e)});
+  });
+}
 </script>
 </body></html>
