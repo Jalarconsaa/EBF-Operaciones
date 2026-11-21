@@ -1,5 +1,5 @@
 // Subir el número de versión fuerza la limpieza de cachés antiguas
-const CACHE = 'ebf-ops-v4';
+const CACHE = 'ebf-ops-v5';
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','./icon-512-maskable.png'])));
@@ -19,6 +19,8 @@ self.addEventListener('activate', e => {
 // Sin internet usa la copia guardada.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Las teselas del mapa no se guardan (política de OpenStreetMap): se piden siempre a la red
+  if (new URL(e.request.url).hostname.endsWith('openstreetmap.org')) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {

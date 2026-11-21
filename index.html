@@ -10,6 +10,8 @@
 <meta name="theme-color" content="#ea580c">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script>window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwaPrompt=e})</script>
 <title>EBF Operaciones</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -31,9 +33,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;color:var(--navy
 .hdr .sub{font-size:.65rem;opacity:.8;margin-top:1px}
 .hdr-back{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:6px;
   padding:7px 10px;cursor:pointer;font-size:1rem;flex-shrink:0}
-.hdr-actions{display:flex;gap:5px;flex-shrink:0}
+.hdr-actions{display:flex;gap:4px;flex-shrink:0}
 .hdr-btn{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);
-  color:#fff;border-radius:6px;padding:6px 9px;cursor:pointer;font-size:.75rem;font-weight:700;white-space:nowrap}
+  color:#fff;border-radius:6px;padding:6px 8px;cursor:pointer;font-size:.75rem;font-weight:700;white-space:nowrap}
 .hdr-btn.wa{background:rgba(37,211,102,.35)}
 /* scroll */
 .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px;
@@ -48,6 +50,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;color:var(--navy
 .card-hdr.amber{background:linear-gradient(135deg,#d97706,#b45309)}
 .card-hdr.teal{background:linear-gradient(135deg,#0891b2,#0e7490)}
 .card-hdr.purple{background:linear-gradient(135deg,#7c3aed,#6d28d9)}
+.card-hdr.red{background:linear-gradient(135deg,#dc2626,#991b1b)}
+.card-hdr.sky{background:linear-gradient(135deg,#0284c7,#0369a1)}
 .card-body{padding:10px 12px;display:flex;flex-direction:column;gap:7px}
 /* checkboxes */
 .cb-wrap{display:flex;flex-wrap:wrap;gap:5px}
@@ -123,9 +127,18 @@ textarea{resize:vertical;min-height:58px}
 .spin{width:36px;height:36px;border:3px solid #e2e8f0;border-top-color:var(--fire);
   border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* barra de % (el CSS global quita el aspecto nativo de los inputs) */
+input[type=range]{-webkit-appearance:auto;appearance:auto;padding:0;border:none;background:transparent;height:30px;accent-color:#16a34a;cursor:pointer}
+input[type=range]:focus{outline:none}
+.mapa{height:260px;border-radius:8px;border:1.5px solid var(--fog);overflow:hidden;background:#e2e8f0}
+.leaflet-container{font:inherit}
+.pin{font-size:30px;line-height:30px;text-shadow:0 2px 4px rgba(0,0,0,.45)}
+.lnk{color:#1d4ed8;font-weight:700;text-decoration:none;font-size:.82rem}
+.sector-t{font-size:.66rem;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin:2px 0}
 </style>
 </head>
 <body><div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.10/babel.min.js"></script>
@@ -174,6 +187,46 @@ function importarRespaldo(file,done){
 
 // ── HELPERS ───────────────────────────────────────────────────────────────
 const toggle=(a,v)=>a.includes(v)?a.filter(x=>x!==v):[...a,v];
+// Fecha y hora LOCAL (toISOString da la hora UTC: de noche en Chile quedaba la fecha de mañana)
+const pad2=n=>String(n).padStart(2,'0');
+const hoyLocal=()=>{const d=new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())};
+const ahoraHM=()=>{const d=new Date();return pad2(d.getHours())+':'+pad2(d.getMinutes())};
+const fechaCL=f=>{const m=String(f||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[3]+'-'+m[2]+'-'+m[1]:(f||'')};
+// Emoji de cada opción (solo se muestra; lo que se guarda es el texto de siempre)
+const EMO={'Pastizal':'🌾','Matorral':'🌿','Bosque':'🌲','Rastrojos':'🍂','Desecho':'🗑️','Área de Interfaz':'🏘️','Predio Forestal':'🌳','Área Urbana':'🏙️','Superficial':'➡️','Copa':'🔥','Subterráneo':'⬇️','Pavesas':'✨','Escalera':'⬆️','Plano':'🟫','Pendiente':'⛰️','Quebrada':'🏞️','Otro':'❔','Leve':'🍃','Moderado':'💨','Fuerte':'🌪️','Viento':'💨','Combustible':'🌿','Estructuras':'🏠','Personas':'👥','Fauna':'🐾','Otros':'⚠️','Directo':'➡️','Indirecto':'↪️','Combinado':'🔀','En combate':'🔥','Contenido':'🧱','Controlado':'✅','Liquidado':'💧','Contener':'🧱','Controlar':'🎯','Liquidar':'💧','Replegar':'↩️','Desmovilizar':'🏁','Mando Único':'👤','Comando Unificado':'🤝','Alta':'🟢','Media':'🟡','Baja':'🔴','Analizar y seguir':'🔎','Preparar y seguir':'🧰','Preparar y defender':'🛡️','Atacar y correr':'⚡','Seguir el frente':'➡️','Mant. reservas':'📦','Bomberos':'🚒','CONAF':'🌲','CORMA':'🏭','Arauco':'🏭','CMPC':'🏭','Vista Hermosa':'🏭','Carabineros':'🚔','Salud':'🏥','PDI':'🕵️','Ejército':'🎖️','Armada':'⚓','Comandante del Incidente':'🎖️','Primer Respondedor':'👨‍🚒'};
+const ico=v=>(EMO[v]?EMO[v]+' ':'')+v;
+// UTM WGS84 (formato habitual en operaciones forestales en Chile: husos 18 y 19)
+function latLonToUTM(lat,lon){lat=parseFloat(lat);lon=parseFloat(lon);
+  if(!isFinite(lat)||!isFinite(lon)||Math.abs(lat)>84||Math.abs(lon)>180)return null;
+  const a=6378137,f=1/298.257223563,k0=0.9996,zona=Math.floor((lon+180)/6)+1,lon0=((zona-1)*6-180+3)*Math.PI/180,phi=lat*Math.PI/180,lam=lon*Math.PI/180-lon0,e2=f*(2-f),ep2=e2/(1-e2);
+  const N=a/Math.sqrt(1-e2*Math.sin(phi)**2),T=Math.tan(phi)**2,C=ep2*Math.cos(phi)**2,A=lam*Math.cos(phi);
+  const M=a*((1-e2/4-3*e2**2/64-5*e2**3/256)*phi-(3*e2/8+3*e2**2/32+45*e2**3/1024)*Math.sin(2*phi)+(15*e2**2/256+45*e2**3/1024)*Math.sin(4*phi)-(35*e2**3/3072)*Math.sin(6*phi));
+  const este=k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T**2+72*C-58*ep2)*A**5/120)+500000;
+  let norte=k0*(M+N*Math.tan(phi)*(A**2/2+(5-T+9*C+4*C**2)*A**4/24+(61-58*T+T**2+600*C-330*ep2)*A**6/720));
+  if(lat<0)norte+=10000000;
+  const banda='CDEFGHJKLMNPQRSTUVWX'[Math.max(0,Math.min(19,Math.floor((lat+80)/8)))];
+  return{zona,banda,este:Math.round(este),norte:Math.round(norte)}}
+const utmTxt=(lat,lon)=>{const u=latLonToUTM(lat,lon);return u?u.zona+u.banda+' '+u.este+' E '+u.norte+' N':''};
+const hayUbic=op=>isFinite(parseFloat(op?.ubic_lat))&&isFinite(parseFloat(op?.ubic_lon));
+const mapaUrl=(lat,lon)=>'https://www.google.com/maps?q='+lat+','+lon;
+const wazeUrl=(lat,lon)=>'https://waze.com/ul?ll='+lat+','+lon+'&navigate=yes';
+const ubicTxt=op=>hayUbic(op)?op.ubic_lat+', '+op.ubic_lon:'';
+// Tiempo transcurrido entre dos fecha-hora ("2 h 15 min")
+function duracionTxt(f1,h1,f2,h2){if(!f1||!h1||!f2||!h2)return '';const m=Math.round((new Date(f2+'T'+h2)-new Date(f1+'T'+h1))/60000);if(!isFinite(m)||m<0)return '';const hh=Math.floor(m/60),mm=m%60;return hh?hh+' h '+mm+' min':mm+' min'}
+// Ubicación actual del dispositivo (GPS)
+function obtenerGPS(){return new Promise((res,rej)=>{
+  if(typeof navigator==='undefined'||!navigator.geolocation)return rej(new Error('Este equipo no permite obtener la ubicación'));
+  navigator.geolocation.getCurrentPosition(p=>res({ubic_lat:p.coords.latitude.toFixed(6),ubic_lon:p.coords.longitude.toFixed(6),ubic_precision:Math.round(p.coords.accuracy||0),ubic_ts:new Date().toISOString(),ubic_fuente:'GPS'}),
+    e=>rej(new Error(e.code===1?'Permiso de ubicación denegado':e.code===2?'Ubicación no disponible':'Se agotó el tiempo buscando señal GPS')),
+    {enableHighAccuracy:true,timeout:20000,maximumAge:0})})}
+// Pantalla completa y actualización (la PWA instalada ya no muestra la barra del navegador)
+const esAppInstalada=()=>{try{return matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||!!navigator.standalone}catch(e){return false}};
+async function alternarPantallaCompleta(){const el=document.documentElement;
+  try{if(document.fullscreenElement){await document.exitFullscreen();return 'salio'}
+    if(el.requestFullscreen){await el.requestFullscreen({navigationUI:'hide'});return 'entro'}
+    if(el.webkitRequestFullscreen){el.webkitRequestFullscreen();return 'entro'}}catch(e){}
+  return 'no'}
+async function actualizarApp(){try{const reg=await navigator.serviceWorker?.getRegistration();if(reg)await reg.update()}catch(e){}location.reload()}
 // ── Opciones del formulario ──
 const TIPOS_INCENDIO=['Pastizal','Matorral','Bosque','Rastrojos','Desecho'];
 const LUGARES=['Área de Interfaz','Predio Forestal','Área Urbana'];
@@ -190,13 +243,15 @@ const SECTORES=[
 const sectorLabel=id=>(SECTORES.find(x=>x.id===id)||{}).label||id;
 // Recursos que se pueden solicitar (se marcan con un clic)
 const SOLICITUD_RECURSOS=[
-  {grupo:'Terrestres',icon:'🚒',color:'#dc2626',items:[{icon:'🚒',label:'Carro Bomba'},{icon:'🚛',label:'Aljibe'},{icon:'🚐',label:'Furgón/Móvil'},{icon:'🛻',label:'Camioneta de Mando'},{icon:'🟩',label:'Brigada Forestal'},{icon:'👷',label:'Cuadrilla Manual'}]},
+  {grupo:'Terrestres',icon:'🚒',color:'#dc2626',items:[{icon:'🚒',label:'Carro Bomba'},{icon:'🚒',label:'Carro Bomba Forestal'},{icon:'🚛',label:'Aljibe'},{icon:'🚐',label:'Furgón/Móvil'},{icon:'🛻',label:'Vehículo de Comando'},{icon:'🟩',label:'Brigada Forestal'},{icon:'🌲',label:'Especialidad Forestal'},{icon:'🔥',label:'EBF Bomberos'}]},
   {grupo:'Aéreos',icon:'🚁',color:'#7c3aed',items:[{icon:'🚁',label:'Helicóptero'},{icon:'💧',label:'Helicóptero con Helibalde'},{icon:'✈️',label:'Avión Tanque'},{icon:'🛩️',label:'Avión Observador/Coordinador'},{icon:'📡',label:'Dron'}]},
-  {grupo:'Maquinaria',icon:'🚜',color:'#92400e',items:[{icon:'🚜',label:'Bulldozer'},{icon:'🏗️',label:'Retroexcavadora'},{icon:'🚧',label:'Motoniveladora'},{icon:'🚜',label:'Tractor con arado'}]},
-  {grupo:'Personal',icon:'👨‍🚒',color:'#16a34a',items:[{icon:'👨‍🚒',label:'Personal de Combate'},{icon:'🎖️',label:'Líder de Brigada'},{icon:'🧭',label:'Jefe de Sector'},{icon:'⛑️',label:'Paramédico (SVB)'},{icon:'🔧',label:'Operador de Maquinaria'}]},
+  {grupo:'Maquinaria',icon:'🚜',color:'#92400e',items:[{icon:'🚜',label:'Bulldozer'},{icon:'⛏️',label:'Retroexcavadora'},{icon:'🚧',label:'Motoniveladora'},{icon:'🚜',label:'Tractor con arado'},{icon:'🚜',label:'Skidder'},{icon:'🏗️',label:'Grúa'}]},
+  {grupo:'Personal',icon:'👨‍🚒',color:'#16a34a',items:[{icon:'👨‍🚒',label:'Personal de Combate'},{icon:'👨‍🚒',label:'Bomberos Forestales'},{icon:'🛠️',label:'Técnico Forestal'},{icon:'🎓',label:'Especialista Forestal'},{icon:'🦺',label:'Prevencionista'},{icon:'🏞️',label:'Guardabosque'},{icon:'🎖️',label:'Líder de Brigada'},{icon:'🧭',label:'Jefe de Sector'},{icon:'⛑️',label:'Paramédico (SVB)'},{icon:'🔧',label:'Operador de Maquinaria'}]},
   {grupo:'Apoyo y emergencias',icon:'🚑',color:'#1d4ed8',items:[{icon:'🚑',label:'Ambulancia'},{icon:'🚔',label:'Patrulla Policial'},{icon:'🛡️',label:'Defensa Civil'},{icon:'🏛️',label:'Municipalidad'}]},
   {grupo:'Logística y mando',icon:'📍',color:'#ea580c',items:[{icon:'🟧',label:'Puesto de Comando'},{icon:'🟡',label:'Área de Espera'},{icon:'🔷',label:'PAP/Abastecimiento'},{icon:'⛽',label:'Camión de Abastecimiento'},{icon:'🔌',label:'Grupo Electrógeno'},{icon:'💡',label:'Torre de Iluminación'},{icon:'📻',label:'Unidad de Comunicaciones'},{icon:'🍞',label:'Alimentación'},{icon:'🛢️',label:'Combustible'}]},
 ];
+const RENOMBRES_RECURSOS={'Camioneta de Mando':'Vehículo de Comando'};
+const colorRecurso=n=>(SOLICITUD_RECURSOS.find(g=>g.items.some(i=>i.label===n))||{}).color||'#64748b';
 const iconoRecurso=n=>{const it=SOLICITUD_RECURSOS.flatMap(g=>g.items).find(i=>i.label===n);return it?it.icon:'📌'};
 const INSTITUCIONES=['Bomberos','CONAF','CORMA','Arauco','CMPC','Vista Hermosa','Carabineros','Salud','PDI','Ejército','Armada','Otro'];
 const RECURSOS_TIPOS=[
@@ -223,8 +278,11 @@ const PASOS=[
 ];
 function newOp(){return{
   id:Date.now(),nombre:'',numero:'',
-  fecha:new Date().toISOString().slice(0,10),
-  hora:new Date().toTimeString().slice(0,5),
+  fecha:hoyLocal(),
+  hora:ahoraHM(),
+  ci_tipo:'Primer Respondedor',ci_nombre:'',ci_contacto:'',
+  ubic_lat:'',ubic_lon:'',ubic_precision:'',ubic_ts:'',ubic_fuente:'',ubic_ref:'',
+  fecha_control:'',hora_control:'',fecha_cierre:'',hora_cierre:'',
   tipo_iiff:[],lugar:[],propagacion:[],terreno:[],pendiente:[],
   superficie_ini:'',viento:'',motor:[],
   amenazas:[],amenazas_cant_def:'',amenazas_cant_nodef:'',amenazas_obs:'',
@@ -233,7 +291,7 @@ function newOp(){return{
   ataque_movil:false,puntos_ataque_movil:[],recursos_ataque_movil:[],
   linea_defensa:false,puntos_linea_defensa:[],recursos_linea_defensa:[],
   patrullaje:false,puntos_patrullaje:[],recursos_patrullaje:[],
-  triage:null,triage_acciones:[],recursos_interfaz:[],
+  triage:null,triage_acciones:[],recursos_interfaz:[],puntos_interfaz:[],
   solicitud_recursos:false,solicitud_lista:[],solicitud_detalle:'',
   fase:'',contenido_pct:'',superficie_fin:'',
   atm_temp:'',atm_viento:'',atm_hr:'',
@@ -248,14 +306,14 @@ function newOp(){return{
 };}
 
 // ── COMPONENTS ────────────────────────────────────────────────────────────
-function CB({label,checked,onChange,color='#ea580c',small,disabled}){
-  return<button className={'cb'+(checked?' on':'')} disabled={disabled}
+function CB({label,checked,onChange,color='#ea580c',small,disabled,single}){
+  return<button className={'cb'+(checked?' on':'')} disabled={disabled} data-single={single?'1':undefined}
     style={{'--c':color,fontSize:small?'.72rem':'.8rem',opacity:disabled?.4:1,cursor:disabled?'not-allowed':'pointer'}} onClick={disabled?undefined:onChange}>
     <span>{checked?'☑':'☐'}</span>{label}
   </button>
 }
 function Sec({title,color='fire',children}){
-  return<div className="card"><div className={`card-hdr ${color}`}>{title}</div>
+  return<div className="card" data-sec="1"><div className={`card-hdr ${color}`}>{title}</div>
     <div className="card-body">{children}</div></div>
 }
 function Fld({label,children}){
@@ -271,10 +329,56 @@ function AsignarRecursos({valor=[],onChange,disponibles=[],color='#15803d',titul
     {valor.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:4}}>{valor.map(t=><span key={t} style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:'.75rem',fontWeight:700,padding:'3px 4px 3px 9px',borderRadius:12,background:color+'22',border:'1px solid '+color,color}}>{t}<button onClick={()=>onChange(valor.filter(x=>x!==t))} title="Quitar" style={{border:'none',background:'none',color,fontSize:'1rem',lineHeight:1,padding:'0 5px',cursor:'pointer'}}>×</button></span>)}</div>}
     {porElegir.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:4}}>{porElegir.map(d=><button key={d.label} title="Asignar a esta tarea" onClick={()=>agregar(d.label)} style={{fontSize:'.75rem',padding:'5px 10px',borderRadius:12,border:'1px dashed '+color,background:'white',color:'#334155',cursor:'pointer'}}>＋ {d.icon} {d.label}</button>)}</div>}
     <div style={{display:'flex',gap:4}}>
-      <input value={nuevo} onChange={e=>setNuevo(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')agregar(nuevo)}} placeholder={disponibles.length?'Otro recurso…':'Escribe el recurso (o agrégalos en el Croquis)'} style={{flex:1,minWidth:0,fontSize:'.8rem',border:'1.5px solid #e2e8f0',borderRadius:6,padding:'7px 9px'}}/>
+      <input value={nuevo} data-noadvance="1" onChange={e=>setNuevo(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')agregar(nuevo)}} placeholder={disponibles.length?'Otro recurso…':'Escribe el recurso (o agrégalos en el Croquis)'} style={{flex:1,minWidth:0,fontSize:'.8rem',border:'1.5px solid #e2e8f0',borderRadius:6,padding:'7px 9px'}}/>
       {nuevo.trim()&&<button onClick={()=>agregar(nuevo)} style={{border:'none',borderRadius:6,padding:'0 14px',background:color,color:'white',fontWeight:700,fontSize:'1rem',cursor:'pointer'}}>+</button>}
     </div>
   </div>
+}
+
+// Sector de la grilla: las PARTES del incendio van separadas de los PUNTOS numerados
+function SectorGrilla({valor=[],onChange}){
+  const grupo=(titulo,lista)=><div style={{marginBottom:4}}><div className="sector-t">{titulo}</div><div className="cb-wrap">{lista.map(sc=><CB key={sc.id} label={sc.label} small color={sc.color} checked={valor.includes(sc.id)} onChange={()=>onChange(toggle(valor,sc.id))}/>)}</div></div>;
+  return<>{grupo('🔥 Partes del incendio',SECTORES.filter(x=>!x.id.startsWith('P-')))}{grupo('🔢 Puntos de la grilla',SECTORES.filter(x=>x.id.startsWith('P-')))}</>
+}
+// Porcentaje: se arrastra con el dedo o se escribe el número (quedan sincronizados)
+function PctSlider({value,onChange,color='#16a34a',label='Porcentaje'}){
+  const pct=Math.max(0,Math.min(100,parseFloat(value)||0));
+  return<div style={{display:'flex',alignItems:'center',gap:10}}>
+    <div style={{flex:1,minWidth:0}}>
+      <input type="range" min="0" max="100" step="1" value={pct} aria-label={label} onChange={e=>onChange(e.target.value)} style={{accentColor:color}}/>
+      <div style={{display:'flex',justifyContent:'space-between',fontSize:'.6rem',color:'#94a3b8'}}><span>0</span><span>25</span><span>50</span><span>75</span><span>100%</span></div>
+    </div>
+    <input type="number" min="0" max="100" value={value||''} placeholder="0-100" onChange={e=>onChange(e.target.value)} style={{width:66,textAlign:'center',fontWeight:700,padding:'8px 4px'}}/>
+    <b style={{fontSize:'1rem',minWidth:42,textAlign:'right',color}}>{pct}%</b>
+  </div>
+}
+// Mapa para marcar el punto del incidente: se toca el mapa o se arrastra el pin
+function MapaUbicacion({lat,lon,onPick}){
+  const ref=useRef(null),mapRef=useRef(null),pinRef=useRef(null);
+  const tiene=isFinite(parseFloat(lat))&&isFinite(parseFloat(lon));
+  const hayLeaflet=typeof window!=='undefined'&&!!window.L;
+  useEffect(()=>{
+    if(!hayLeaflet||!ref.current)return;
+    const L=window.L;
+    if(!mapRef.current){
+      const m=L.map(ref.current).setView(tiene?[parseFloat(lat),parseFloat(lon)]:[-35.43,-72.4],tiene?16:9);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(m);
+      m.on('click',e=>onPick(e.latlng.lat,e.latlng.lng));
+      mapRef.current=m;setTimeout(()=>m.invalidateSize(),200);
+    }
+    const m=mapRef.current;
+    if(tiene){
+      const p=[parseFloat(lat),parseFloat(lon)];
+      if(!pinRef.current){
+        pinRef.current=L.marker(p,{draggable:true,icon:L.divIcon({html:'<div class="pin">📍</div>',className:'',iconSize:[30,30],iconAnchor:[15,30]})}).addTo(m);
+        pinRef.current.on('dragend',e=>{const q=e.target.getLatLng();onPick(q.lat,q.lng)});
+      }else pinRef.current.setLatLng(p);
+      m.setView(p,Math.max(m.getZoom(),15));
+    }
+  },[lat,lon]);
+  useEffect(()=>()=>{if(mapRef.current){mapRef.current.remove();mapRef.current=null;pinRef.current=null}},[]);
+  if(!hayLeaflet)return<div style={{padding:'12px',fontSize:'.8rem',color:'#64748b',background:'#f1f5f9',borderRadius:8,textAlign:'center'}}>🗺 El mapa necesita conexión a internet. Las coordenadas se guardan igual.</div>;
+  return<div className="mapa" ref={ref}/>
 }
 
 function BitacoraInput({onAdd}){
@@ -303,7 +407,7 @@ function Croquis({recursos,onChange}){
   const dn=(e,id)=>{e.preventDefault();const c=gc(e);const r=recursos.find(x=>x.id===id);if(!r)return;setDrag(id);setOff({x:c.x-r.x,y:c.y-r.y});};
   const mv=useCallback(e=>{if(!drag)return;e.preventDefault();const c=gc(e);onChange(recursos.map(r=>r.id===drag?{...r,x:Math.max(16,Math.min(W-16,c.x-off.x)),y:Math.max(16,Math.min(H-16,c.y-off.y))}:r));},[drag,off,recursos]);
   const up=useCallback(()=>setDrag(null),[]);
-  const add=()=>{if(!newR.label.trim())return;onChange([...recursos,{id:Date.now(),icon:newR.tipo.icon,label:newR.label,tipo:newR.tipo.label,shape:newR.tipo.shape,color:newR.tipo.color,x:W/2+Math.random()*40-20,y:H/2+Math.random()*40-20}]);setNewR(p=>({...p,label:''}));};
+  const add=()=>{const esp=['pc','are','pap'].includes(newR.tipo.shape);let nombre=newR.label.trim();if(!nombre&&!esp){const n=recursos.filter(r=>r.tipo===newR.tipo.label).length;nombre=n?newR.tipo.label+' '+(n+1):newR.tipo.label}onChange([...recursos,{id:Date.now(),icon:newR.tipo.icon,label:nombre,tipo:newR.tipo.label,shape:newR.tipo.shape,color:newR.tipo.color,x:W/2+Math.random()*40-20,y:H/2+Math.random()*40-20}]);setNewR(p=>({...p,label:''}));};
   const del=id=>onChange(recursos.filter(r=>r.id!==id));
   const saveEdit=()=>{onChange(recursos.map(r=>r.id===editId?{...r,label:editVal}:r));setEditId(null);};
   const Xbtn=({cx,cy,id})=><g><circle cx={cx} cy={cy} r={8} fill="#dc2626" onClick={e=>{e.stopPropagation();del(id)}} style={{cursor:'pointer'}}/><text x={cx} y={cy+3} textAnchor="middle" fontSize="10" fill="white" onClick={e=>{e.stopPropagation();del(id)}} style={{cursor:'pointer'}}>×</text></g>;
@@ -349,12 +453,12 @@ function Croquis({recursos,onChange}){
       <select value={newR.tipo.label} onChange={e=>setNewR(p=>({...p,tipo:RECURSOS_TIPOS.find(t=>t.label===e.target.value)||RECURSOS_TIPOS[0]}))} style={{fontSize:12,padding:'7px 8px',border:'1.5px solid #e2e8f0',borderRadius:6,flex:'0 0 auto',maxWidth:160}}>
         {RECURSOS_TIPOS.map(t=><option key={t.label} value={t.label}>{t.shape==='pc'?'🟧':t.shape==='are'?'🟡':t.shape==='pap'?'🔷':t.icon} {t.label}</option>)}
       </select>
-      <input value={newR.label} onChange={e=>setNewR(p=>({...p,label:e.target.value}))} placeholder="ID (ej: BF-4)…" style={{flex:1,minWidth:0,fontSize:12,padding:'7px 8px',border:'1.5px solid #e2e8f0',borderRadius:6}} onKeyDown={e=>e.key==='Enter'&&add()}/>
+      <input value={newR.label} onChange={e=>setNewR(p=>({...p,label:e.target.value}))} placeholder="ID opcional (ej: BF-4)…" style={{flex:1,minWidth:0,fontSize:12,padding:'7px 8px',border:'1.5px solid #e2e8f0',borderRadius:6}} onKeyDown={e=>e.key==='Enter'&&add()}/>
       <button onClick={add} style={{padding:'8px 12px',background:'#dc2626',color:'white',border:'none',borderRadius:6,cursor:'pointer',fontWeight:700,fontSize:13,flexShrink:0}}>+</button>
     </div>
     {recursos.length>0&&<div style={{marginTop:5,display:'flex',flexWrap:'wrap',gap:3}}>
       {recursos.map(r=><span key={r.id} className="rec-chip" style={{borderColor:r.color||'#ddd',color:r.color||'#333',background:(r.color||'#ddd')+'18'}}>
-        {r.shape==='pc'?'🟧':r.shape==='are'?'🟡':r.shape==='pap'?'🔷':r.icon} {r.label}
+        {r.shape==='pc'?'🟧':r.shape==='are'?'🟡':r.shape==='pap'?'🔷':r.icon} {r.label||r.tipo}
       </span>)}
     </div>}
   </div>
@@ -368,9 +472,12 @@ function buildWA(op){
   return encodeURIComponent(
     '🧯 *RESUMEN OPERACIONAL EBF*\n━━━━━━━━━━━━━━━\n'+
     '🔥 *'+(op.nombre||'Incidente')+'*\n'+
-    L('📋','N°',op.numero)+L('📅','Fecha',op.fecha)+L('⏰','Hora',op.hora)+
+    L('📋','N°',op.numero)+L('📅','Fecha',fechaCL(op.fecha))+L('⏰','Hora',op.hora)+
+    L('🎖️',op.ci_tipo||'Mando inicial',[op.ci_nombre,op.ci_contacto&&'📞 '+op.ci_contacto].filter(Boolean).join(' · '))+
+    (hayUbic(op)?'\n📍 *UBICACIÓN*\n'+L('📌','Coordenadas',ubicTxt(op))+L('🧭','UTM WGS84',utmTxt(op.ubic_lat,op.ubic_lon))+L('🗺','Mapa',mapaUrl(op.ubic_lat,op.ubic_lon)):'')+L('🛣','Cómo llegar',op.ubic_ref)+
     '\n🔎 *EVALUACIÓN*\n'+
-    L('🌲','Tipo de incendio',op.tipo_iiff?.join(', '))+L('📍','Lugar',op.lugar?.join(', '))+
+    L('🌲','Tipo de incendio',op.tipo_iiff?.join(', '))+L('📍','Lugar',op.lugar?.join(', '))+L('💨','Propagación',op.propagacion?.join(', '))+
+    L('🏔','Terreno',(op.terreno||[]).join(', ')+(op.terreno?.includes('Pendiente')&&op.pendiente?.length?' · '+op.pendiente.join(', '):''))+L('📐','Sup. inicial',op.superficie_ini?op.superficie_ini+' m²':'')+L('🌬','Viento',op.viento)+
     L('⚡','Motor',op.motor?.join(', '))+L('⚠️','Amenazas',op.amenazas?.join(', '))+
     L('🎯','Objetivos',op.objetivos)+
     '\n⚔️ *TÁCTICAS*\n'+
@@ -379,13 +486,17 @@ function buildWA(op){
     tacWA(op.linea_defensa,'Línea de defensa',op.puntos_linea_defensa,op.recursos_linea_defensa)+
     tacWA(op.patrullaje,'Patrullaje',op.puntos_patrullaje,op.recursos_patrullaje)+
     L('🏠','Triage estructural',op.triage===true?'SÍ'+((op.triage_acciones||[]).length?' · '+op.triage_acciones.join(', '):''):op.triage===false?'NO':'')+
+    L('📍','Sector en interfaz',(op.puntos_interfaz||[]).map(sectorLabel).join(', '))+
     L('🚒','Recursos en interfaz',(op.recursos_interfaz||[]).join(', '))+
     L('🔧','Solicitud de recursos',op.solicitud_recursos?'SÍ'+((op.solicitud_lista||[]).length?' · '+op.solicitud_lista.join(', '):'')+(op.solicitud_detalle?' — '+op.solicitud_detalle:''):'NO')+
     '\n📊 *SITUACIÓN*\n'+
     L('🚦','Fase',op.fase+(op.contenido_pct?' '+op.contenido_pct+'%':''))+
+    L('✅','Control del incendio',op.fecha_control?fechaCL(op.fecha_control)+' '+op.hora_control+(duracionTxt(op.fecha,op.hora,op.fecha_control,op.hora_control)?' (⏳ '+duracionTxt(op.fecha,op.hora,op.fecha_control,op.hora_control)+')':''):'')+
+    L('🏁','Cierre del incidente',op.fecha_cierre?fechaCL(op.fecha_cierre)+' '+op.hora_cierre+(duracionTxt(op.fecha,op.hora,op.fecha_cierre,op.hora_cierre)?' (⏳ '+duracionTxt(op.fecha,op.hora,op.fecha_cierre,op.hora_cierre)+')':''):'')+
     L('✅','Acción',op.accion?.join(', '))+L('⚙️','Mando SCI',op.forma_mando)+
     L('🏛','Instituciones',op.instituciones?.join(', '))+
     L('🟧','PC',op.pc_lugar)+L('🟡','Área Espera',op.are_lugar)+L('🔷','PAP',op.pap_lugar)+
+    (op.recursos_croquis?.length?'\n🗺 *RECURSOS EN ESCENA*\n'+op.recursos_croquis.map(r=>'  '+r.icon+' '+(r.label||r.tipo)+(r.label&&r.label!==r.tipo?' ('+r.tipo+')':'')).join('\n')+'\n':'')+
     (op.bitacora?.length?'\n📓 *BITÁCORA*\n'+op.bitacora.map(e=>'  🕐 '+e.hora+' — '+e.texto).join('\n')+'\n':'')+
     L('💬','Obs',op.observaciones)+
     '\n📊 *SITUACIÓN AL TRASPASO*\n'+
@@ -446,6 +557,7 @@ function buildPDFHtml(op){
   <div class="hdr"><div style="font-size:28pt">🧯</div><div style="flex:1"><div style="font-size:7pt;opacity:.8">RESUMEN OPERACIONAL · PRIMER RESPONDEDOR FORESTAL</div><h1>${val(op.nombre)}</h1></div><div style="text-align:right"><div style="font-size:6pt;opacity:.6;text-transform:uppercase">N° Operación</div><div style="font-size:18pt;font-weight:900">${val(op.numero)}</div></div></div>
   <div class="stripe"></div>
   <div class="meta"><div class="mc"><div class="l">📅 Fecha</div><div class="v">${val(op.fecha)}</div></div><div class="mc"><div class="l">⏰ Hora</div><div class="v">${val(op.hora)}</div></div><div class="mc"><div class="l">🚦 Fase</div><div class="v">${val(op.fase)}${op.contenido_pct?' '+op.contenido_pct+'%':''}</div></div><div class="mc"><div class="l">✅ Estado</div><div class="v">${val(op.estado)}</div></div></div>
+  <div class="sec"><div class="st" style="background:linear-gradient(135deg,#dc2626,#991b1b)">🎖️ MANDO INICIAL Y UBICACIÓN</div><div class="sb"><div class="g2"><div class="it"><b>🎖️ ${val(op.ci_tipo)}</b>${val(op.ci_nombre)}${op.ci_contacto?'<br>📞 '+op.ci_contacto:''}</div><div class="it"><b>📍 Ubicación del incidente</b>${hayUbic(op)?op.ubic_lat+', '+op.ubic_lon+'<br>🧭 UTM WGS84: '+utmTxt(op.ubic_lat,op.ubic_lon)+(op.ubic_fuente==='GPS'?' · GPS ±'+op.ubic_precision+' m':'')+'<br><a href="'+mapaUrl(op.ubic_lat,op.ubic_lon)+'">'+mapaUrl(op.ubic_lat,op.ubic_lon)+'</a>':'—'}${op.ubic_ref?'<br>🛣 '+op.ubic_ref:''}</div></div></div></div>
   <div class="sec"><div class="st g">🔥 EVALUACIÓN INICIAL</div><div class="sb">
   <div class="g3" style="margin-bottom:5px"><div class="it"><b>A · Tipo de Incendio</b>${TIPOS_INCENDIO.map(v=>`${ck(op.tipo_iiff?.includes(v))} ${v}`).join('<br>')}</div><div class="it"><b>B · Lugar donde ocurre</b>${LUGARES.map(v=>`${ck(op.lugar?.includes(v))} ${v}`).join(' · ')}</div><div class="it"><b>C · Propagación</b>${PROPAGACIONES.map(v=>`${ck(op.propagacion?.includes(v))} ${v}`).join(' · ')}</div></div>
   <div class="g4" style="margin-bottom:5px"><div class="it"><b>D · Terreno</b>${arr(op.terreno)}${op.terreno?.includes('Pendiente')&&op.pendiente?.length?'<br><i>'+op.pendiente.join(', ')+'</i>':''}</div><div class="it"><b>E · Sup. ini.</b>${val(op.superficie_ini)} m²</div><div class="it"><b>F · Viento</b>${val(op.viento)}</div><div class="it"><b>G · Motor</b>${arr(op.motor)}</div></div>
@@ -455,11 +567,12 @@ function buildPDFHtml(op){
   ${tac('ataque_movil','Ataque móvil (Línea húmeda)','puntos_ataque_movil','recursos_ataque_movil')}
   ${tac('linea_defensa','Línea de defensa (manual)','puntos_linea_defensa','recursos_linea_defensa')}
   ${tac('patrullaje','Patrullaje','puntos_patrullaje','recursos_patrullaje')}
-  <div class="it" style="margin-bottom:5px"><b>🏠 Triage estructural</b> ${op.triage===true?'SÍ':op.triage===false?'NO':'—'} ${op.triage_acciones?.length?'· '+op.triage_acciones.join(' · '):''}${(op.recursos_interfaz||[]).length?'<br>🚒 <b>Recursos:</b> '+op.recursos_interfaz.join(', '):''}</div>
+  <div class="it" style="margin-bottom:5px"><b>🏠 Triage estructural</b> ${op.triage===true?'SÍ':op.triage===false?'NO':'—'} ${op.triage_acciones?.length?'· '+op.triage_acciones.join(' · '):''}${(op.puntos_interfaz||[]).length?'<br>📍 <b>Sector:</b> '+op.puntos_interfaz.map(sectorLabel).join(', '):''}${(op.recursos_interfaz||[]).length?'<br>🚒 <b>Recursos:</b> '+op.recursos_interfaz.join(', '):''}</div>
   <div class="it"><b>K · Solicitud de Recursos: ${op.solicitud_recursos?'SÍ':'NO'}</b>${op.solicitud_recursos&&listaSolic.length?'<br>'+listaSolic.map(n=>`<span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 7px;border-radius:10px;background:#f1f5f9;border:1px solid #cbd5e1">${iconoRecurso(n)} ${n}</span>`).join(''):''}${op.solicitud_recursos&&op.solicitud_detalle?'<br><i>'+op.solicitud_detalle+'</i>':''}</div>
   </div></div>
   <div class="sec"><div class="st b">📋 INFORMACIÓN COMPLEMENTARIA</div><div class="sb">
   <div class="g4" style="margin-bottom:5px"><div class="it"><b>L · Fase</b>${val(op.fase)}${op.contenido_pct?' '+op.contenido_pct+'%':''}</div><div class="it"><b>M · Sup. fin.</b>${val(op.superficie_fin)} m²</div><div class="it"><b>N · Meteo</b>🌡${val(op.atm_temp)}°C 💨${val(op.atm_viento)} 💧${val(op.atm_hr)}%</div><div class="it"><b>O · Acción</b>${arr(op.accion)}</div></div>
+  <div class="g2" style="margin-bottom:5px"><div class="it"><b>✅ Control del incendio</b>${op.fecha_control?fechaCL(op.fecha_control)+' '+val(op.hora_control)+(duracionTxt(op.fecha,op.hora,op.fecha_control,op.hora_control)?' · ⏳ '+duracionTxt(op.fecha,op.hora,op.fecha_control,op.hora_control):''):'—'}</div><div class="it"><b>🏁 Cierre del incidente</b>${op.fecha_cierre?fechaCL(op.fecha_cierre)+' '+val(op.hora_cierre)+(duracionTxt(op.fecha,op.hora,op.fecha_cierre,op.hora_cierre)?' · ⏳ '+duracionTxt(op.fecha,op.hora,op.fecha_cierre,op.hora_cierre):''):'—'}</div></div>
   <div class="g2" style="margin-bottom:5px"><div class="it"><b>⚙️ Mando SCI</b>${val(op.forma_mando)}</div><div class="it"><b>🏛 Instituciones</b>${arr(op.instituciones)}</div></div>
   <div class="g3" style="margin-bottom:5px"><div class="it"><b>🟧 PC</b>${val(op.pc_lugar)}</div><div class="it"><b>🟡 Área Espera (E)</b>${val(op.are_lugar)}</div><div class="it"><b>🔷 PAP</b>${val(op.pap_lugar)}</div></div>
   <div class="it"><b>💬 Obs</b>${val(op.observaciones)}</div>
@@ -509,6 +622,10 @@ function App(){
   const[waDest,setWaDest]=useState('');
   const[emailModal,setEmailModal]=useState(false);
   const[emailDest,setEmailDest]=useState('');
+  const[cierre,setCierre]=useState(null);              // cierre de incidente desde la lista
+  const[buscandoGPS,setBuscandoGPS]=useState(false);
+  const[canInstall,setCanInstall]=useState(!!window.__pwaPrompt);
+  const opRef=useRef(null),opsRef=useRef([]),scrollRef=useRef(null);
 
   const showToast=useCallback(m=>{setToast(m);setTimeout(()=>setToast(null),2200)},[]);
 
@@ -522,57 +639,103 @@ function App(){
     await dbSaveOp(updated);
   },[]);
 
+  opRef.current=op;opsRef.current=ops;
   const s=(k,v)=>persist({...op,[k]:v});
-  const nueva=()=>{setOp(newOp());setPaso(0)};
-  const abrir=o=>{setOp({...newOp(),...o});setPaso(0)};
+  const setMany=obj=>persist({...op,...obj});
+  // Al crear una operación nueva se marca sola la ubicación actual (se puede corregir en el mapa)
+  const nueva=()=>{const o=newOp();opRef.current=o;setOp(o);setPaso(0);
+    obtenerGPS().then(pos=>{const cur=opRef.current;if(cur&&cur.id===o.id&&!hayUbic(cur)){const upd={...cur,...pos};setOp(upd);if(opsRef.current.some(x=>x.id===upd.id)){setOps(prev=>prev.map(x=>x.id===upd.id?upd:x));dbSaveOp(upd)}showToast('📍 Ubicación marcada (±'+pos.ubic_precision+' m)')}})
+      .catch(e=>showToast('📍 '+e.message+' · márcala a mano'))};
+  const marcarUbicacion=async()=>{setBuscandoGPS(true);showToast('📡 Buscando señal GPS…');try{const pos=await obtenerGPS();persist({...opRef.current,...pos});showToast('✅ Ubicación marcada (±'+pos.ubic_precision+' m)')}catch(e){showToast('⚠️ '+e.message)}setBuscandoGPS(false)};
+  const elegirEnMapa=(la,lo)=>persist({...opRef.current,ubic_lat:la.toFixed(6),ubic_lon:lo.toFixed(6),ubic_fuente:'Mapa',ubic_precision:'',ubic_ts:new Date().toISOString()});
+  // Cierre de incidente: solo desde la lista
+  const pedirCierre=o=>setCierre({id:o.id,nombre:o.nombre||'Sin nombre',fecha:hoyLocal(),hora:ahoraHM()});
+  const confirmarCierre=async()=>{if(!cierre.fecha||!cierre.hora)return showToast('Indica fecha y hora del cierre');const o=ops.find(x=>x.id===cierre.id);if(o){const upd={...o,estado:'cerrada',fecha_cierre:cierre.fecha,hora_cierre:cierre.hora};setOps(prev=>prev.map(x=>x.id===upd.id?upd:x));await dbSaveOp(upd)}setCierre(null);showToast('✅ Incidente cerrado')};
+  const reabrir=async o=>{const upd={...o,estado:'activa',fecha_cierre:'',hora_cierre:''};setOps(prev=>prev.map(x=>x.id===upd.id?upd:x));await dbSaveOp(upd)};
+  // Pantalla completa, actualizar e instalar
+  const pantallaCompleta=async()=>{const r=await alternarPantallaCompleta();if(r==='no')showToast('📱 En iPhone: Compartir → «Añadir a pantalla de inicio»')};
+  const actualizar=async()=>{if(opRef.current)await persist({...opRef.current});await actualizarApp()};
+  const instalar=async()=>{const p=window.__pwaPrompt;if(!p)return;p.prompt();try{await p.userChoice}catch(e){}window.__pwaPrompt=null;setCanInstall(false)};
+  useEffect(()=>{const h=e=>{e.preventDefault();window.__pwaPrompt=e;setCanInstall(true)};const ok=()=>{window.__pwaPrompt=null;setCanInstall(false)};window.addEventListener('beforeinstallprompt',h);window.addEventListener('appinstalled',ok);return()=>{window.removeEventListener('beforeinstallprompt',h);window.removeEventListener('appinstalled',ok)}},[]);
+  // Avance automático: al completar un campo se pasa solo al siguiente por completar
+  const CAMPOS='input:not([type=range]):not([type=checkbox]):not([type=file]):not([type=hidden]), textarea, select';
+  const enfocar=el=>{if(!el)return false;el.focus({preventScroll:true});el.scrollIntoView?.({block:'center',behavior:'smooth'});return true};
+  const libres=cont=>[...cont.querySelectorAll(CAMPOS)].filter(el=>!el.disabled&&!el.closest('[data-noadvance]'));
+  const siguienteCampo=desde=>{const cont=scrollRef.current;if(!cont)return;const campos=libres(cont);const sig=campos.slice(campos.indexOf(desde)+1).find(el=>!el.value);if(!enfocar(sig))desde.blur?.()};
+  const avanzarSeccion=btn=>{const cont=scrollRef.current;if(!cont)return;const sec=btn.closest('[data-sec]');const propio=sec?[...sec.querySelectorAll(CAMPOS)].find(el=>!el.disabled&&!el.value&&!el.closest('[data-noadvance]')):null;if(enfocar(propio))return;const secs=[...cont.querySelectorAll('[data-sec]')];const sig=secs[secs.indexOf(sec)+1];if(!sig)return;sig.scrollIntoView?.({block:'center',behavior:'smooth'});const f=[...sig.querySelectorAll(CAMPOS)].find(el=>!el.disabled&&!el.value&&!el.closest('[data-noadvance]'));if(f)f.focus({preventScroll:true})};
+  const onKeyScroll=e=>{const t=e.target;if(e.key!=='Enter'||t.tagName!=='INPUT'||t.closest('[data-noadvance]')||['checkbox','range','file'].includes(t.type))return;e.preventDefault();siguienteCampo(t)};
+  const onChangeScroll=e=>{if(e.target.tagName==='SELECT'&&!e.target.closest('[data-noadvance]'))setTimeout(()=>siguienteCampo(e.target),60)};
+  const onClickScroll=e=>{const b=e.target.closest?.('button[data-single]');if(b)setTimeout(()=>avanzarSeccion(b),80)};
+  const abrir=o=>{setOp({...newOp(),...o,solicitud_lista:(o.solicitud_lista||[]).map(n=>RENOMBRES_RECURSOS[n]||n)});setPaso(0)};
   const cerrar=()=>setOp(null);
   const del=async id=>{const l=ops.filter(o=>o.id!==id);setOps(l);if(op?.id===id)setOp(null);await dbDelOp(id);};
   const save=async()=>{await persist({...op});showToast('💾 Guardado');};
 
-  const inp={style:{width:'100%',padding:'9px 10px',border:'1.5px solid #e2e8f0',borderRadius:6,fontSize:'.88rem',fontFamily:'inherit',background:'white',color:'#1e293b'}};
+  const inp={enterKeyHint:'next',style:{width:'100%',padding:'9px 10px',border:'1.5px solid #e2e8f0',borderRadius:6,fontSize:'.88rem',fontFamily:'inherit',background:'white',color:'#1e293b'}};
 
   if(loading)return<div id="app"><div className="loading"><div className="spin"/><span>Cargando operaciones…</span></div></div>;
 
   if(!op)return<div id="app">
     {toast&&<div className="toast">{toast}</div>}
-    <div className="hdr"><div style={{flex:1}}><div className="sub">PRIMER RESPONDEDOR FORESTAL · v4 (21-nov)</div><h1 style={{fontSize:'1.1rem'}}>🧯 EBF Operaciones</h1></div><div className="hdr-actions"><button className="hdr-btn" onClick={exportarRespaldo} title="Guardar respaldo">📤</button><label className="hdr-btn" style={{cursor:'pointer'}} title="Restaurar respaldo">📥<input type="file" accept=".json,application/json" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f)importarRespaldo(f,n=>{dbLoadOps().then(setOps);showToast(n<0?'⚠️ Archivo no válido':'📥 '+n+' operación(es) restauradas')});e.target.value=''}}/></label><button className="hdr-btn" onClick={nueva}>+ Nueva</button></div></div>
+    <div className="hdr"><div style={{flex:1,minWidth:0}}><div className="sub">PRIMER RESPONDEDOR FORESTAL · v5 (21-nov)</div><h1 style={{fontSize:'1rem',whiteSpace:'normal',lineHeight:1.15}}>🧯 EBF Operaciones</h1></div><div className="hdr-actions">{!esAppInstalada()&&<button className="hdr-btn" onClick={pantallaCompleta} title="Pantalla completa (oculta la barra del navegador)">⛶</button>}{canInstall&&!esAppInstalada()&&<button className="hdr-btn" onClick={instalar} title="Instalar como app">📲</button>}<button className="hdr-btn" onClick={actualizar} title="Actualizar la pantalla">🔄</button><button className="hdr-btn" onClick={exportarRespaldo} title="Guardar respaldo">📤</button><label className="hdr-btn" style={{cursor:'pointer'}} title="Restaurar respaldo">📥<input type="file" accept=".json,application/json" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f)importarRespaldo(f,n=>{dbLoadOps().then(setOps);showToast(n<0?'⚠️ Archivo no válido':'📥 '+n+' operación(es) restauradas')});e.target.value=''}}/></label><button className="hdr-btn" onClick={nueva}>+ Nueva</button></div></div>
     <div className="scroll">
       {ops.length===0?<div className="empty"><div style={{fontSize:'3rem',marginBottom:12}}>🔥</div><p>Sin operaciones</p><p style={{fontSize:'.8rem',marginTop:6}}>Toca "+ Nueva" para comenzar</p></div>
       :ops.map(o=><div key={o.id} className={'op-item '+(o.estado==='cerrada'?'cerrada':'')}>
         <div style={{flex:1}}><div className="op-name">{o.nombre||'Sin nombre'}</div>
-          <div className="op-meta">{o.fecha} {o.hora} · N°{o.numero||'—'} · <span style={{color:o.estado==='cerrada'?'#16a34a':'#ea580c',fontWeight:700}}>{o.estado}</span></div></div>
+          <div className="op-meta">{fechaCL(o.fecha)} {o.hora} · N°{o.numero||'—'} · <span style={{color:o.estado==='cerrada'?'#16a34a':'#ea580c',fontWeight:700}}>{o.estado==='cerrada'?'🏁':'🔥'} {o.estado}</span>{o.estado==='cerrada'&&o.fecha_cierre&&<span> · Cierre: {fechaCL(o.fecha_cierre)} {o.hora_cierre}</span>}</div>{o.ci_nombre&&<div className="op-meta">🎖️ {o.ci_nombre}</div>}</div>
         <button onClick={()=>abrir(o)} style={{padding:'6px 12px',background:'#1e293b',color:'white',border:'none',borderRadius:5,cursor:'pointer',fontSize:'.8rem',fontWeight:600,marginRight:5}}>Abrir</button>
+        {o.estado==='activa'||!o.estado?<button onClick={()=>pedirCierre(o)} title="Cerrar el incidente" style={{padding:'6px 9px',background:'#16a34a',color:'white',border:'none',borderRadius:5,cursor:'pointer',fontSize:'.8rem',fontWeight:600,marginRight:5}}>✅ Cerrar</button>:<button onClick={()=>reabrir(o)} title="Reabrir el incidente" style={{padding:'6px 9px',background:'#f1f5f9',color:'#475569',border:'1px solid #cbd5e1',borderRadius:5,cursor:'pointer',fontSize:'.8rem',fontWeight:600,marginRight:5}}>↩️ Reabrir</button>}
         <button onClick={()=>del(o.id)} style={{padding:'6px 9px',background:'#fee2e2',color:'#dc2626',border:'none',borderRadius:5,cursor:'pointer',fontSize:'.85rem'}}>🗑</button>
       </div>)}
     </div>
+    {cierre&&<div className="modal-bg" onClick={()=>setCierre(null)}><div className="modal" onClick={e=>e.stopPropagation()}>
+      <div className="modal-title">🏁 Cerrar incidente</div>
+      <div style={{fontSize:'.8rem',color:'#64748b',marginBottom:10}}>{cierre.nombre}</div>
+      <Fld label="Fecha y hora del cierre"><div style={{display:'flex',gap:6}}><input type="date" value={cierre.fecha} onChange={e=>setCierre(c=>({...c,fecha:e.target.value}))} aria-label="Fecha de cierre"/><input type="time" value={cierre.hora} onChange={e=>setCierre(c=>({...c,hora:e.target.value}))} aria-label="Hora de cierre"/></div></Fld>
+      <button className="btn btn-ghost btn-sm" style={{marginTop:6}} onClick={()=>setCierre(c=>({...c,fecha:hoyLocal(),hora:ahoraHM()}))}>🕐 Ahora</button>
+      <div style={{display:'flex',gap:8,marginTop:12}}><button className="btn btn-ghost" style={{flex:1}} onClick={()=>setCierre(null)}>Cancelar</button><button className="btn btn-green" style={{flex:1}} onClick={confirmarCierre}>✅ Confirmar</button></div>
+    </div></div>}
   </div>;
 
   const avancePct=Math.max(0,Math.min(100,parseFloat(op.avance_pct)||0));
   // Recursos que se pueden asignar a una táctica: los del croquis + los escritos en «Recursos asignados»
   const recursosDisp=(()=>{const m=new Map();
-    (op.recursos_croquis||[]).forEach(r=>{const k=String(r.label||'').trim();if(k&&!m.has(k))m.set(k,{label:k,icon:r.shape==='pc'?'🟧':r.shape==='are'?'🟡':r.shape==='pap'?'🔷':(r.icon||'📍')})});
+    (op.recursos_croquis||[]).forEach(r=>{const k=String(r.label||r.tipo||'').trim();if(k&&!m.has(k))m.set(k,{label:k,icon:r.shape==='pc'?'🟧':r.shape==='are'?'🟡':r.shape==='pap'?'🔷':(r.icon||'📍')})});
     String(op.recursos_asignados||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean).forEach(k=>{if(!m.has(k))m.set(k,{label:k,icon:'🚒'})});
     return [...m.values()]})();
   const steps=[
   <div style={{display:'flex',flexDirection:'column',gap:9}}>
+    <Sec title="🎖️ Mando inicial: Comandante del Incidente o Primer Respondedor" color="red">
+      <div className="cb-wrap">{['Comandante del Incidente','Primer Respondedor'].map(v=><CB key={v} single label={ico(v)} checked={op.ci_tipo===v} onChange={()=>s('ci_tipo',v)} color="#b91c1c"/>)}</div>
+      <Fld label="👤 Nombre y cargo"><input {...inp} value={op.ci_nombre||''} onChange={e=>s('ci_nombre',e.target.value)} placeholder="Ej: Juan Alarcón — Líder EBF" style={{...inp.style,fontWeight:700}}/></Fld>
+      <Fld label="📞 Teléfono / radio"><input {...inp} type="tel" value={op.ci_contacto||''} onChange={e=>s('ci_contacto',e.target.value)} placeholder="+56 9… / canal"/></Fld>
+    </Sec>
     <div className="card"><div className="card-body" style={{gap:7}}>
-      <Fld label="Nombre del incidente"><input {...inp} value={op.nombre} onChange={e=>s('nombre',e.target.value)} placeholder="Incendio Forestal Loma Limpia…" style={{...inp.style,fontWeight:700,fontSize:'1rem'}}/></Fld>
-      <div className="row3"><Fld label="N° Op."><input {...inp} value={op.numero} onChange={e=>s('numero',e.target.value)}/></Fld><Fld label="Fecha"><input {...inp} type="date" value={op.fecha} onChange={e=>s('fecha',e.target.value)}/></Fld><Fld label="Hora"><input {...inp} type="time" value={op.hora} onChange={e=>s('hora',e.target.value)}/></Fld></div>
+      <Fld label="🔥 Nombre del incidente"><input {...inp} value={op.nombre} onChange={e=>s('nombre',e.target.value)} placeholder="Incendio Forestal Loma Limpia…" style={{...inp.style,fontWeight:700,fontSize:'1rem'}}/></Fld>
+      <div className="row3"><Fld label="🔢 N° Op."><input {...inp} value={op.numero} onChange={e=>s('numero',e.target.value)}/></Fld><Fld label="📅 Fecha"><input {...inp} type="date" value={op.fecha} onChange={e=>s('fecha',e.target.value)}/></Fld><Fld label="⏰ Hora"><input {...inp} type="time" value={op.hora} onChange={e=>s('hora',e.target.value)}/></Fld></div>
     </div></div>
-    <Sec title="A · Tipo de Incendio" color="fire"><div className="cb-wrap">{TIPOS_INCENDIO.map(v=><CB key={v} label={v} checked={op.tipo_iiff.includes(v)} onChange={()=>s('tipo_iiff',toggle(op.tipo_iiff,v))} color="#16a34a"/>)}</div></Sec>
-    <Sec title="B · Lugar donde ocurre" color="fire"><div className="cb-wrap">{LUGARES.map(v=><CB key={v} label={v} checked={op.lugar.includes(v)} onChange={()=>s('lugar',toggle(op.lugar,v))} color="#16a34a"/>)}</div></Sec>
-    <Sec title="C · Propagación" color="fire"><div className="cb-wrap">{PROPAGACIONES.map(v=><CB key={v} label={v} checked={op.propagacion.includes(v)} onChange={()=>s('propagacion',toggle(op.propagacion,v))} color="#16a34a"/>)}</div></Sec>
-    <Sec title="D · Terreno" color="fire"><div className="cb-wrap" style={{marginBottom:5}}>{['Plano','Pendiente','Quebrada','Otro'].map(v=><CB key={v} label={v} checked={op.terreno.includes(v)} onChange={()=>{const t=toggle(op.terreno,v);persist({...op,terreno:t,pendiente:t.includes('Pendiente')?op.pendiente:[]})}} color="#16a34a"/>)}</div><div style={{fontSize:'.68rem',color:'#6b7280',marginBottom:3}}>% de pendiente{op.terreno.includes('Pendiente')?'':' (se activa al marcar «Pendiente»)'}</div><div className="cb-wrap">{PENDIENTES.map(v=><CB key={v} label={v} small disabled={!op.terreno.includes('Pendiente')} checked={op.pendiente.includes(v)} onChange={()=>s('pendiente',toggle(op.pendiente,v))} color="#6b7280"/>)}</div></Sec>
+    <Sec title="📍 Ubicación del incidente — para que lleguen los demás recursos" color="sky">
+      <button className="btn btn-fire" style={{width:'100%',padding:11,background:'#0369a1'}} onClick={marcarUbicacion} disabled={buscandoGPS}>{buscandoGPS?'📡 Buscando señal GPS…':'📍 Marcar mi ubicación actual'}</button>
+      <MapaUbicacion lat={op.ubic_lat} lon={op.ubic_lon} onPick={elegirEnMapa}/>
+      <div style={{fontSize:'.72rem',color:'#64748b'}}>👆 Toca el mapa o arrastra el pin para ajustar el punto</div>
+      <div className="row2"><Fld label="Latitud"><input {...inp} inputMode="decimal" value={op.ubic_lat||''} placeholder="-35.333000" onChange={e=>setMany({ubic_lat:e.target.value,ubic_fuente:'Manual',ubic_precision:'',ubic_ts:new Date().toISOString()})}/></Fld><Fld label="Longitud"><input {...inp} inputMode="decimal" value={op.ubic_lon||''} placeholder="-72.416700" onChange={e=>setMany({ubic_lon:e.target.value,ubic_fuente:'Manual',ubic_precision:'',ubic_ts:new Date().toISOString()})}/></Fld></div>
+      {hayUbic(op)&&<div style={{fontSize:'.8rem',lineHeight:1.7}}><div>🧭 UTM WGS84: <b>{utmTxt(op.ubic_lat,op.ubic_lon)}</b></div><div style={{color:'#64748b'}}>{op.ubic_fuente==='GPS'?'📡 GPS · precisión ±'+op.ubic_precision+' m':op.ubic_fuente==='Mapa'?'👆 Marcada en el mapa':'✏️ Ingresada a mano'}</div><div><a className="lnk" href={mapaUrl(op.ubic_lat,op.ubic_lon)} target="_blank" rel="noreferrer">🗺 Abrir en Google Maps</a> · <a className="lnk" href={wazeUrl(op.ubic_lat,op.ubic_lon)} target="_blank" rel="noreferrer">🚗 Waze</a></div></div>}
+      <Fld label="🛣️ Cómo llegar / referencia"><input {...inp} value={op.ubic_ref||''} onChange={e=>s('ubic_ref',e.target.value)} placeholder="Camino a Putú km 12, portón verde…"/></Fld>
+    </Sec>
+    <Sec title="A · 🔥 Tipo de Incendio" color="fire"><div className="cb-wrap">{TIPOS_INCENDIO.map(v=><CB key={v} label={ico(v)} checked={op.tipo_iiff.includes(v)} onChange={()=>s('tipo_iiff',toggle(op.tipo_iiff,v))} color="#16a34a"/>)}</div></Sec>
+    <Sec title="B · 📍 Lugar donde ocurre" color="fire"><div className="cb-wrap">{LUGARES.map(v=><CB key={v} label={ico(v)} checked={op.lugar.includes(v)} onChange={()=>s('lugar',toggle(op.lugar,v))} color="#16a34a"/>)}</div></Sec>
+    <Sec title="C · 💨 Propagación" color="fire"><div className="cb-wrap">{PROPAGACIONES.map(v=><CB key={v} label={ico(v)} checked={op.propagacion.includes(v)} onChange={()=>s('propagacion',toggle(op.propagacion,v))} color="#16a34a"/>)}</div></Sec>
+    <Sec title="D · ⛰️ Terreno" color="fire"><div className="cb-wrap" style={{marginBottom:5}}>{['Plano','Pendiente','Quebrada','Otro'].map(v=><CB key={v} label={ico(v)} checked={op.terreno.includes(v)} onChange={()=>{const t=toggle(op.terreno,v);persist({...op,terreno:t,pendiente:t.includes('Pendiente')?op.pendiente:[]})}} color="#16a34a"/>)}</div><div style={{fontSize:'.68rem',color:'#6b7280',marginBottom:3}}>% de pendiente{op.terreno.includes('Pendiente')?'':' (se activa al marcar «Pendiente»)'}</div><div className="cb-wrap">{PENDIENTES.map(v=><CB key={v} label={v} small disabled={!op.terreno.includes('Pendiente')} checked={op.pendiente.includes(v)} onChange={()=>s('pendiente',toggle(op.pendiente,v))} color="#6b7280"/>)}</div></Sec>
     <div className="row2">
-      <Sec title="E · Sup. ini." color="fire"><input {...inp} value={op.superficie_ini} onChange={e=>s('superficie_ini',e.target.value)} placeholder="m²"/></Sec>
-      <Sec title="F · Viento" color="fire"><div className="cb-wrap">{['Leve','Moderado','Fuerte'].map(v=><CB key={v} label={v} checked={op.viento===v} onChange={()=>s('viento',op.viento===v?'':v)} color="#16a34a"/>)}</div></Sec>
+      <Sec title="E · 📐 Sup. ini." color="fire"><input {...inp} value={op.superficie_ini} onChange={e=>s('superficie_ini',e.target.value)} placeholder="m²"/></Sec>
+      <Sec title="F · 🌬️ Viento" color="fire"><div className="cb-wrap">{['Leve','Moderado','Fuerte'].map(v=><CB key={v} single label={ico(v)} checked={op.viento===v} onChange={()=>s('viento',op.viento===v?'':v)} color="#16a34a"/>)}</div></Sec>
     </div>
-    <Sec title="G · Motor" color="fire"><div className="cb-wrap">{['Viento','Pendiente','Combustible'].map(v=><CB key={v} label={v} checked={op.motor.includes(v)} onChange={()=>s('motor',toggle(op.motor,v))} color="#16a34a"/>)}</div></Sec>
-    <Sec title="H · Amenazas" color="fire"><div className="cb-wrap" style={{marginBottom:5}}>{AMENAZAS.map(v=><CB key={v} label={v} checked={op.amenazas.includes(v)} onChange={()=>s('amenazas',toggle(op.amenazas,v))} color="#dc2626"/>)}</div>
+    <Sec title="G · ⚙️ Motor" color="fire"><div className="cb-wrap">{['Viento','Pendiente','Combustible'].map(v=><CB key={v} label={ico(v)} checked={op.motor.includes(v)} onChange={()=>s('motor',toggle(op.motor,v))} color="#16a34a"/>)}</div></Sec>
+    <Sec title="H · ⚠️ Amenazas" color="fire"><div className="cb-wrap" style={{marginBottom:5}}>{AMENAZAS.map(v=><CB key={v} label={ico(v)} checked={op.amenazas.includes(v)} onChange={()=>s('amenazas',toggle(op.amenazas,v))} color="#dc2626"/>)}</div>
       {op.amenazas.includes('Estructuras')&&<div className="row2" style={{marginBottom:5}}><Fld label="Def."><input {...inp} type="number" value={op.amenazas_cant_def} onChange={e=>s('amenazas_cant_def',e.target.value)}/></Fld><Fld label="No Def."><input {...inp} type="number" value={op.amenazas_cant_nodef} onChange={e=>s('amenazas_cant_nodef',e.target.value)}/></Fld></div>}
       <input {...inp} value={op.amenazas_obs} onChange={e=>s('amenazas_obs',e.target.value)} placeholder="Observaciones amenazas…"/></Sec>
-    <Sec title="I · Objetivos" color="fire"><textarea {...inp} rows={3} value={op.objetivos} onChange={e=>s('objetivos',e.target.value)} placeholder="Detener el avance en… dentro de los próximos…"/></Sec>
-    <Sec title="K · Solicitud de Recursos" color="fire">
+    <Sec title="I · 🎯 Objetivos" color="fire"><textarea {...inp} enterKeyHint="enter" rows={3} value={op.objetivos} onChange={e=>s('objetivos',e.target.value)} placeholder="Detener el avance en… dentro de los próximos…"/></Sec>
+    <Sec title="K · 📨 Solicitud de Recursos" color="fire">
       <div className="cb-wrap" style={{marginBottom:5,alignItems:'center'}}>
         <CB label="NO" checked={!op.solicitud_recursos} onChange={()=>s('solicitud_recursos',false)} color="#16a34a"/>
         <CB label="SÍ" checked={op.solicitud_recursos} onChange={()=>s('solicitud_recursos',true)} color="#dc2626"/>
@@ -584,31 +747,33 @@ function App(){
           <div style={{fontSize:'.68rem',fontWeight:800,color:g.color,textTransform:'uppercase',marginBottom:3}}>{g.icon} {g.grupo}</div>
           <div className="cb-wrap">{g.items.map(it=><CB key={it.label} small label={it.icon+' '+it.label} color={g.color} checked={(op.solicitud_lista||[]).includes(it.label)} onChange={()=>s('solicitud_lista',toggle(op.solicitud_lista||[],it.label))}/>)}</div>
         </div>)}
+        {(()=>{const cat=SOLICITUD_RECURSOS.flatMap(g=>g.items.map(i=>i.label));const otros=(op.solicitud_lista||[]).filter(n=>!cat.includes(n));return otros.length>0&&<div><div style={{fontSize:'.68rem',fontWeight:800,color:'#64748b',textTransform:'uppercase',marginBottom:3}}>📌 Otros marcados (ya no están en la lista)</div><div className="cb-wrap">{otros.map(n=><CB key={n} small label={'📌 '+n} color="#64748b" checked onChange={()=>s('solicitud_lista',toggle(op.solicitud_lista||[],n))}/>)}</div></div>})()}
         <input {...inp} value={op.solicitud_detalle||''} onChange={e=>s('solicitud_detalle',e.target.value)} placeholder="Observación (opcional)…"/>
       </div>}
     </Sec>
   </div>,
   <div style={{display:'flex',flexDirection:'column',gap:9}}>
-    <Sec title="Tipo de combate" color="blue"><div className="cb-wrap"><CB label="Directo" checked={op.met_directo} onChange={()=>s('met_directo',!op.met_directo)} color="#2563eb"/><CB label="Indirecto" checked={op.met_indirecto} onChange={()=>s('met_indirecto',!op.met_indirecto)} color="#7c3aed"/><CB label="Combinado" checked={!!op.met_combinado} onChange={()=>s('met_combinado',!op.met_combinado)} color="#0f766e"/></div></Sec>
+    <Sec title="🗡️ Tipo de combate" color="blue"><div className="cb-wrap"><CB label={ico('Directo')} checked={op.met_directo} onChange={()=>s('met_directo',!op.met_directo)} color="#2563eb"/><CB label={ico('Indirecto')} checked={op.met_indirecto} onChange={()=>s('met_indirecto',!op.met_indirecto)} color="#7c3aed"/><CB label={ico('Combinado')} checked={!!op.met_combinado} onChange={()=>s('met_combinado',!op.met_combinado)} color="#0f766e"/></div></Sec>
     <Sec title="🌿 IIFF Vegetación Común" color="blue">
-      {[{k:'ataque_movil',pk:'puntos_ataque_movil',rk:'recursos_ataque_movil',l:'Ataque móvil (Línea húmeda)'},{k:'linea_defensa',pk:'puntos_linea_defensa',rk:'recursos_linea_defensa',l:'Línea de defensa (manual)'},{k:'patrullaje',pk:'puntos_patrullaje',rk:'recursos_patrullaje',l:'Patrullaje'}].map(({k,pk,rk,l})=><div key={k} style={{marginBottom:7}}><CB label={l} checked={!!op[k]} onChange={()=>s(k,!op[k])} color="#15803d"/>{op[k]&&<div style={{marginTop:4,marginLeft:6,background:'#f0fdf4',borderRadius:5,padding:'5px 8px',border:'1px solid #bbf7d0'}}><div style={{fontSize:'.7rem',fontWeight:700,color:'#166534',marginBottom:3}}>📍 Sector en grilla:</div><div className="cb-wrap">{SECTORES.map(sc=><CB key={sc.id} label={sc.label} small color={sc.color} checked={(op[pk]||[]).includes(sc.id)} onChange={()=>s(pk,toggle(op[pk]||[],sc.id))}/>)}</div><AsignarRecursos valor={op[rk]||[]} onChange={v=>s(rk,v)} disponibles={recursosDisp} color="#166534"/></div>}</div>)}
+      {[{k:'ataque_movil',pk:'puntos_ataque_movil',rk:'recursos_ataque_movil',l:'💧 Ataque móvil (Línea húmeda)'},{k:'linea_defensa',pk:'puntos_linea_defensa',rk:'recursos_linea_defensa',l:'⛏️ Línea de defensa (manual)'},{k:'patrullaje',pk:'puntos_patrullaje',rk:'recursos_patrullaje',l:'👣 Patrullaje'}].map(({k,pk,rk,l})=><div key={k} style={{marginBottom:7}}><CB label={l} checked={!!op[k]} onChange={()=>s(k,!op[k])} color="#15803d"/>{op[k]&&<div style={{marginTop:4,marginLeft:6,background:'#f0fdf4',borderRadius:5,padding:'5px 8px',border:'1px solid #bbf7d0'}}><div style={{fontSize:'.7rem',fontWeight:700,color:'#166534',marginBottom:3}}>📍 Sector en grilla:</div><SectorGrilla valor={op[pk]||[]} onChange={v=>s(pk,v)}/><AsignarRecursos valor={op[rk]||[]} onChange={v=>s(rk,v)} disponibles={recursosDisp} color="#166534"/></div>}</div>)}
     </Sec>
     <Sec title="🏠 IIFF Interfaz — Triage" color="amber">
       <div className="cb-wrap" style={{marginBottom:7}}><CB label="SÍ" checked={op.triage===true} onChange={()=>s('triage',true)} color="#c2410c"/><CB label="NO" checked={op.triage===false} onChange={()=>s('triage',false)} color="#16a34a"/></div>
       {op.triage===true&&op.amenazas.includes('Estructuras')&&<div className="row2" style={{marginBottom:7}}><Fld label="Defendibles"><input {...inp} type="number" value={op.amenazas_cant_def} onChange={e=>s('amenazas_cant_def',e.target.value)}/></Fld><Fld label="No Defendibles"><input {...inp} type="number" value={op.amenazas_cant_nodef} onChange={e=>s('amenazas_cant_nodef',e.target.value)}/></Fld></div>}
-      <div className="cb-wrap" style={{marginBottom:5}}>{['Analizar y seguir','Preparar y seguir','Preparar y defender','Atacar y correr','Seguir el frente','Mant. reservas'].map(v=><CB key={v} label={v} small checked={(op.triage_acciones||[]).includes(v)} onChange={()=>s('triage_acciones',toggle(op.triage_acciones||[],v))} color="#c2410c"/>)}</div>
-      {(op.triage===true||(op.triage_acciones||[]).length>0)&&<AsignarRecursos valor={op.recursos_interfaz||[]} onChange={v=>s('recursos_interfaz',v)} disponibles={recursosDisp} color="#c2410c" titulo="Recursos asignados a interfaz"/>}
+      <div className="cb-wrap" style={{marginBottom:5}}>{['Analizar y seguir','Preparar y seguir','Preparar y defender','Atacar y correr','Seguir el frente','Mant. reservas'].map(v=><CB key={v} label={ico(v)} small checked={(op.triage_acciones||[]).includes(v)} onChange={()=>s('triage_acciones',toggle(op.triage_acciones||[],v))} color="#c2410c"/>)}</div>
+      {(op.triage===true||(op.triage_acciones||[]).length>0)&&<div style={{marginTop:6,paddingTop:5,borderTop:'1px dashed #c2410c66'}}><div style={{fontSize:'.7rem',fontWeight:700,color:'#c2410c',marginBottom:3}}>📍 Sector en grilla:</div><SectorGrilla valor={op.puntos_interfaz||[]} onChange={v=>s('puntos_interfaz',v)}/><AsignarRecursos valor={op.recursos_interfaz||[]} onChange={v=>s('recursos_interfaz',v)} disponibles={recursosDisp} color="#c2410c" titulo="Recursos asignados a interfaz"/></div>}
     </Sec>
   </div>,
   <div style={{display:'flex',flexDirection:'column',gap:9}}>
-    <Sec title="L · Fase" color="teal"><div className="cb-wrap" style={{marginBottom:5}}>{['En combate','Contenido','Controlado','Liquidado'].map(v=><CB key={v} label={v} checked={op.fase===v} onChange={()=>s('fase',op.fase===v?'':v)} color="#0891b2"/>)}</div>{op.fase==='Contenido'&&<input {...inp} value={op.contenido_pct} onChange={e=>s('contenido_pct',e.target.value)} placeholder="% contenido"/>}</Sec>
-    <div className="row2"><Sec title="M · Sup. final" color="teal"><input {...inp} value={op.superficie_fin} onChange={e=>s('superficie_fin',e.target.value)} placeholder="m²"/></Sec><Sec title="O · Acción" color="teal"><div className="cb-wrap">{['Contener','Controlar','Liquidar','Replegar','Desmovilizar'].map(v=><CB key={v} label={v} small checked={op.accion.includes(v)} onChange={()=>s('accion',toggle(op.accion,v))} color="#0891b2"/>)}</div></Sec></div>
-    <Sec title="N · Meteo" color="teal"><div className="row3"><Fld label="Temp °C"><input {...inp} type="number" value={op.atm_temp} onChange={e=>s('atm_temp',e.target.value)}/></Fld><Fld label="Viento km/h"><input {...inp} type="number" value={op.atm_viento} onChange={e=>s('atm_viento',e.target.value)}/></Fld><Fld label="HR %"><input {...inp} type="number" value={op.atm_hr} onChange={e=>s('atm_hr',e.target.value)}/></Fld></div></Sec>
-    <Sec title="⚙️ Forma de Mando SCI" color="purple"><div className="cb-wrap">{['Mando Único','Comando Unificado'].map(v=><CB key={v} label={v} checked={op.forma_mando===v} onChange={()=>s('forma_mando',op.forma_mando===v?'':v)} color="#7c3aed"/>)}</div></Sec>
-    <Sec title="🏛 Instituciones presentes" color="navy"><div className="cb-wrap">{INSTITUCIONES.map(v=><CB key={v} label={v} small checked={(op.instituciones||[]).includes(v)} onChange={()=>s('instituciones',toggle(op.instituciones||[],v))} color="#334155"/>)}</div></Sec>
+    <Sec title="L · 🚦 Fase" color="teal"><div className="cb-wrap" style={{marginBottom:5}}>{['En combate','Contenido','Controlado','Liquidado'].map(v=><CB key={v} label={ico(v)} checked={op.fase===v} onChange={()=>{const nv=op.fase===v?'':v;const extra=(nv==='Controlado'&&!op.fecha_control)?{fecha_control:hoyLocal(),hora_control:ahoraHM()}:{};setMany({fase:nv,...extra})}} color="#0891b2"/>)}</div>{op.fase==='Contenido'&&<div style={{background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:6,padding:'6px 10px'}}><div style={{fontSize:'.7rem',fontWeight:700,color:'#1d4ed8',marginBottom:2}}>🧱 % del perímetro contenido</div><PctSlider value={op.contenido_pct} onChange={v=>s('contenido_pct',v)} color="#2563eb" label="Porcentaje contenido"/></div>}</Sec>
+    <Sec title="⏱️ Control y cierre del incidente" color="teal">{[['✅ Control del incendio','fecha_control','hora_control'],['🏁 Cierre del incidente','fecha_cierre','hora_cierre']].map(([t,fk,hk])=><div key={fk}><div style={{fontSize:'.78rem',fontWeight:700,color:'#0f766e',marginBottom:3}}>{t}</div><div style={{display:'flex',gap:6}}><input type="date" value={op[fk]||''} onChange={e=>s(fk,e.target.value)} aria-label={'Fecha: '+t}/><input type="time" value={op[hk]||''} onChange={e=>s(hk,e.target.value)} aria-label={'Hora: '+t} style={{width:118,flexShrink:0}}/><button className="btn btn-ghost btn-sm" title="Poner la fecha y hora de ahora" onClick={()=>setMany({[fk]:hoyLocal(),[hk]:ahoraHM()})}>🕐</button></div>{duracionTxt(op.fecha,op.hora,op[fk],op[hk])&&<div style={{fontSize:'.72rem',color:'#475569',marginTop:3}}>⏳ {duracionTxt(op.fecha,op.hora,op[fk],op[hk])} desde el inicio ({fechaCL(op.fecha)} {op.hora})</div>}</div>)}</Sec>
+    <div className="row2"><Sec title="M · 📐 Sup. final" color="teal"><input {...inp} value={op.superficie_fin} onChange={e=>s('superficie_fin',e.target.value)} placeholder="m²"/></Sec><Sec title="O · ✅ Acción" color="teal"><div className="cb-wrap">{['Contener','Controlar','Liquidar','Replegar','Desmovilizar'].map(v=><CB key={v} label={ico(v)} small checked={op.accion.includes(v)} onChange={()=>s('accion',toggle(op.accion,v))} color="#0891b2"/>)}</div></Sec></div>
+    <Sec title="N · 🌡️ Meteo" color="teal"><div className="row3"><Fld label="🌡 Temp °C"><input {...inp} type="number" value={op.atm_temp} onChange={e=>s('atm_temp',e.target.value)}/></Fld><Fld label="💨 Viento km/h"><input {...inp} type="number" value={op.atm_viento} onChange={e=>s('atm_viento',e.target.value)}/></Fld><Fld label="💧 HR %"><input {...inp} type="number" value={op.atm_hr} onChange={e=>s('atm_hr',e.target.value)}/></Fld></div></Sec>
+    <Sec title="⚙️ Forma de Mando SCI" color="purple"><div className="cb-wrap">{['Mando Único','Comando Unificado'].map(v=><CB key={v} single label={ico(v)} checked={op.forma_mando===v} onChange={()=>s('forma_mando',op.forma_mando===v?'':v)} color="#7c3aed"/>)}</div></Sec>
+    <Sec title="🏛 Instituciones presentes" color="navy"><div className="cb-wrap">{INSTITUCIONES.map(v=><CB key={v} label={ico(v)} small checked={(op.instituciones||[]).includes(v)} onChange={()=>s('instituciones',toggle(op.instituciones||[],v))} color="#334155"/>)}</div></Sec>
     <div className="row3"><Sec title="🟧 PC" color="amber"><input {...inp} value={op.pc_lugar} onChange={e=>s('pc_lugar',e.target.value)} placeholder="Ubicación…"/></Sec><Sec title="🟡 Área Espera (E)" color="amber"><input {...inp} value={op.are_lugar} onChange={e=>s('are_lugar',e.target.value)} placeholder="Ubicación…"/></Sec><Sec title="🔷 PAP" color="amber"><input {...inp} value={op.pap_lugar} onChange={e=>s('pap_lugar',e.target.value)} placeholder="Ubicación…"/></Sec></div>
-    <Sec title="Recursos" color="navy"><Fld label="Asignados"><textarea {...inp} rows={2} value={op.recursos_asignados} onChange={e=>s('recursos_asignados',e.target.value)} placeholder="BF4, B5, Arauco…"/></Fld><Fld label="Disponibles"><textarea {...inp} rows={2} value={op.recursos_disponibles} onChange={e=>s('recursos_disponibles',e.target.value)} placeholder="Z5, BT1…"/></Fld></Sec>
-    <Sec title="💬 Observaciones" color="navy"><textarea {...inp} rows={3} value={op.observaciones} onChange={e=>s('observaciones',e.target.value)} placeholder="CU Conaf - PAP a cargo bomberos…"/></Sec>
+    <Sec title="🚒 Recursos" color="navy"><Fld label="Asignados"><textarea {...inp} enterKeyHint="enter" rows={2} value={op.recursos_asignados} onChange={e=>s('recursos_asignados',e.target.value)} placeholder="BF4, B5, Arauco…"/></Fld><Fld label="Disponibles"><textarea {...inp} enterKeyHint="enter" rows={2} value={op.recursos_disponibles} onChange={e=>s('recursos_disponibles',e.target.value)} placeholder="Z5, BT1…"/></Fld></Sec>
+    <Sec title="💬 Observaciones" color="navy"><textarea {...inp} enterKeyHint="enter" rows={3} value={op.observaciones} onChange={e=>s('observaciones',e.target.value)} placeholder="CU Conaf - PAP a cargo bomberos…"/></Sec>
     <Sec title="📓 Bitácora" color="navy">
       <div className="bita-list">{(op.bitacora||[]).length===0?<div style={{padding:10,fontSize:'.8rem',color:'#94a3b8',textAlign:'center',fontStyle:'italic'}}>Sin entradas</div>:[...(op.bitacora||[])].reverse().map((e,i)=><div key={i} className="bita-row"><span className="bita-hora">{e.hora}</span><span className="bita-txt">{e.texto}</span><button className="bita-del" onClick={()=>s('bitacora',(op.bitacora||[]).filter((_,j)=>j!==(op.bitacora.length-1-i)))}>×</button></div>)}</div>
       <BitacoraInput onAdd={texto=>s('bitacora',[...(op.bitacora||[]),{hora:new Date().toTimeString().slice(0,5),texto}])}/>
@@ -622,25 +787,20 @@ function App(){
     <div style={{background:'linear-gradient(135deg,#14532d,#166534)',borderRadius:8,padding:'14px 16px',color:'white',display:'flex',flexDirection:'column',gap:11}}>
       <div style={{fontSize:'.7rem',textTransform:'uppercase',opacity:.6}}>P · Traspaso de Mando</div>
       <Fld label={<span style={{color:'rgba(255,255,255,.6)'}}>Entrega el mando</span>}><input style={{...inp.style,background:'rgba(255,255,255,.12)',border:'1px solid rgba(255,255,255,.2)',color:'white',fontWeight:700}} value={op.mando_entrega} onChange={e=>s('mando_entrega',e.target.value)} placeholder="Nombre y cargo…"/></Fld>
+      {!op.mando_entrega&&op.ci_nombre&&<button onClick={()=>s('mando_entrega',op.ci_nombre)} style={{alignSelf:'flex-start',padding:'4px 12px',border:'1px solid rgba(255,255,255,.4)',background:'transparent',color:'white',borderRadius:14,fontSize:'.75rem',cursor:'pointer'}}>↳ Usar al mando inicial: {op.ci_nombre}</button>}
       <Fld label={<span style={{color:'rgba(255,255,255,.6)'}}>Recibe el mando</span>}><input style={{...inp.style,background:'rgba(255,255,255,.12)',border:'1px solid rgba(255,255,255,.2)',color:'white',fontWeight:700}} value={op.mando_recibe} onChange={e=>s('mando_recibe',e.target.value)} placeholder="Nombre y cargo…"/></Fld>
     </div>
     <Sec title="📊 Situación al momento del traspaso" color="amber">
-      <Fld label="🚚 Recursos en camino"><textarea {...inp} rows={2} value={op.recursos_camino||''} onChange={e=>s('recursos_camino',e.target.value)} placeholder="Ej: BF-6 llega en 20 min…"/></Fld>
-      <Fld label="🚒 Recursos asignados"><textarea {...inp} rows={2} value={op.recursos_asignados||''} onChange={e=>s('recursos_asignados',e.target.value)} placeholder="BF4, B5, Arauco…"/></Fld>
-      <Fld label="🚗 Recursos disponibles"><textarea {...inp} rows={2} value={op.recursos_disponibles||''} onChange={e=>s('recursos_disponibles',e.target.value)} placeholder="Z5, BT1…"/></Fld>
-      <div className="fld"><label className="lbl">📈 % de avance</label>
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <input {...inp} type="number" min="0" max="100" style={{...inp.style,width:80}} value={op.avance_pct||''} onChange={e=>s('avance_pct',e.target.value)} placeholder="0-100"/>
-          <div style={{flex:1,height:14,background:'#e2e8f0',borderRadius:7,overflow:'hidden'}}><div style={{width:avancePct+'%',height:'100%',background:'linear-gradient(90deg,#16a34a,#84cc16)'}}/></div>
-          <b style={{minWidth:40,textAlign:'right',color:'#166534'}}>{avancePct}%</b>
-        </div></div>
+      <Fld label="🚚 Recursos en camino"><textarea {...inp} enterKeyHint="enter" rows={2} value={op.recursos_camino||''} onChange={e=>s('recursos_camino',e.target.value)} placeholder="Ej: BF-6 llega en 20 min…"/></Fld>
+      <Fld label="🚒 Recursos asignados"><textarea {...inp} enterKeyHint="enter" rows={2} value={op.recursos_asignados||''} onChange={e=>s('recursos_asignados',e.target.value)} placeholder="BF4, B5, Arauco…"/></Fld>
+      <Fld label="🚗 Recursos disponibles"><textarea {...inp} enterKeyHint="enter" rows={2} value={op.recursos_disponibles||''} onChange={e=>s('recursos_disponibles',e.target.value)} placeholder="Z5, BT1…"/></Fld>
+      <div className="fld"><label className="lbl">📈 % de avance</label><PctSlider value={op.avance_pct} onChange={v=>s('avance_pct',v)} color="#16a34a" label="Porcentaje de avance"/></div>
       <div className="fld"><label className="lbl">🎯 Proyección de cumplimiento del objetivo</label>
-        <div className="cb-wrap">{[['Alta','#16a34a'],['Media','#d97706'],['Baja','#dc2626']].map(([v,c])=><CB key={v} label={v} color={c} checked={op.proyeccion_objetivo===v} onChange={()=>s('proyeccion_objetivo',op.proyeccion_objetivo===v?'':v)}/>)}</div>
+        <div className="cb-wrap">{[['Alta','#16a34a'],['Media','#d97706'],['Baja','#dc2626']].map(([v,c])=><CB key={v} single label={ico(v)} color={c} checked={op.proyeccion_objetivo===v} onChange={()=>s('proyeccion_objetivo',op.proyeccion_objetivo===v?'':v)}/>)}</div>
         <input {...inp} style={{...inp.style,marginTop:5}} value={op.proyeccion_obs||''} onChange={e=>s('proyeccion_obs',e.target.value)} placeholder="Fundamento (ej: viento a favor…)"/></div>
       <Fld label="⏱ Tiempo proyectado para el control"><input {...inp} value={op.tiempo_control||''} onChange={e=>s('tiempo_control',e.target.value)} placeholder="Ej: 3 h 30 min"/></Fld>
     </Sec>
     <div className="card"><div className="card-hdr navy">Resumen rápido</div><div className="card-body"><div className="row2" style={{gap:4}}>{[['Incidente',op.nombre||'—'],['N°',op.numero||'—'],['Fecha',op.fecha],['Fase',op.fase||(op.contenido_pct?op.contenido_pct+'%':'—')],['Motor',(op.motor||[]).join(', ')||'—'],['Acción',(op.accion||[]).join(', ')||'—'],['% avance',op.avance_pct?avancePct+'%':'—'],['Proyección',op.proyeccion_objetivo||'—'],['Control en',op.tiempo_control||'—'],['En camino',op.recursos_camino||'—']].map(([k,v])=><div key={k} style={{background:'#f8fafc',borderRadius:4,padding:'4px 7px',border:'1px solid #e2e8f0'}}><div style={{fontSize:'.65rem',fontWeight:700,color:'#9ca3af',textTransform:'uppercase'}}>{k}</div><div style={{fontWeight:600,fontSize:'.85rem'}}>{v}</div></div>)}</div></div></div>
-    <button className="btn btn-green" style={{width:'100%',padding:12}} onClick={()=>{persist({...op,estado:'cerrada'});showToast('✅ Operación cerrada');cerrar();}}>✅ Cerrar operación</button>
   </div>,
   ];
 
@@ -651,12 +811,14 @@ function App(){
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <div className="modal-title">📧 Enviar por Email</div>
         <Fld label="Destinatario"><input value={emailDest} onChange={e=>setEmailDest(e.target.value)} placeholder="nombre@correo.cl" style={{width:'100%',padding:'9px 10px',border:'1.5px solid #e2e8f0',borderRadius:6,fontSize:'.88rem'}}/></Fld>
-        <div style={{display:'flex',gap:8,marginTop:12}}><button className="btn btn-ghost" style={{flex:1}} onClick={()=>setEmailModal(false)}>Cancelar</button><button className="btn" style={{flex:1,background:'#1d4ed8',color:'white'}} onClick={()=>{const sub=encodeURIComponent(`[EBF Constitución] Resumen Operacional — ${op.nombre||'Incidente'} ${op.fecha}`);const body=encodeURIComponent(`RESUMEN OPERACIONAL EBF CONSTITUCIÓN\n=====================================\nIncidente: ${op.nombre||'—'}  N°: ${op.numero||'—'}\nFecha: ${op.fecha}  Hora: ${op.hora}\n\nTIPO DE INCENDIO: ${(op.tipo_iiff||[]).join(', ')||'—'}\nLUGAR: ${(op.lugar||[]).join(', ')||'—'}\nMOTOR: ${(op.motor||[]).join(', ')||'—'}\nAMENAZAS: ${(op.amenazas||[]).join(', ')||'—'}\nOBJETIVOS: ${op.objetivos||'—'}\nCOMBATE: ${[op.met_directo&&'Directo',op.met_indirecto&&'Indirecto',op.met_combinado&&'Combinado'].filter(Boolean).join(' + ')||'—'}\nSOLICITUD DE RECURSOS: ${op.solicitud_recursos?'SÍ'+((op.solicitud_lista||[]).length?' · '+op.solicitud_lista.join(', '):''):'NO'}\n\nFASE: ${op.fase||'—'}${op.contenido_pct?' '+op.contenido_pct+'%':''}\nACCIÓN: ${(op.accion||[]).join(', ')||'—'}\nMANDO SCI: ${op.forma_mando||'—'}\nPC: ${op.pc_lugar||'—'}\nÁREA ESPERA: ${op.are_lugar||'—'}\nPAP: ${op.pap_lugar||'—'}\n\nSITUACIÓN AL TRASPASO\nEn camino: ${op.recursos_camino||'—'}\nAsignados: ${op.recursos_asignados||'—'}\nDisponibles: ${op.recursos_disponibles||'—'}\nAvance: ${op.avance_pct?op.avance_pct+'%':'—'}\nProyección: ${op.proyeccion_objetivo||'—'}\nTiempo para el control: ${op.tiempo_control||'—'}\n\nTRASPASO DE MANDO\nEntrega: ${op.mando_entrega||'—'}\nRecibe: ${op.mando_recibe||'—'}\n\nEBF Constitución — ${new Date().toLocaleString('es-CL')}`);window.location.href=`mailto:${emailDest}?subject=${sub}&body=${body}`;setEmailModal(false);}}>📧 Abrir correo</button></div>
+        <div style={{display:'flex',gap:8,marginTop:12}}><button className="btn btn-ghost" style={{flex:1}} onClick={()=>setEmailModal(false)}>Cancelar</button><button className="btn" style={{flex:1,background:'#1d4ed8',color:'white'}} onClick={()=>{const sub=encodeURIComponent(`[EBF Constitución] Resumen Operacional — ${op.nombre||'Incidente'} ${op.fecha}`);const body=encodeURIComponent(`RESUMEN OPERACIONAL EBF CONSTITUCIÓN\n=====================================\nIncidente: ${op.nombre||'—'}  N°: ${op.numero||'—'}\nFecha: ${fechaCL(op.fecha)}  Hora: ${op.hora}\n${op.ci_tipo||'Mando inicial'}: ${op.ci_nombre||'—'}${op.ci_contacto?' ('+op.ci_contacto+')':''}\nUBICACIÓN: ${hayUbic(op)?ubicTxt(op)+' · UTM '+utmTxt(op.ubic_lat,op.ubic_lon)+' · '+mapaUrl(op.ubic_lat,op.ubic_lon):'—'}${op.ubic_ref?'\nCÓMO LLEGAR: '+op.ubic_ref:''}\n\nTIPO DE INCENDIO: ${(op.tipo_iiff||[]).join(', ')||'—'}\nLUGAR: ${(op.lugar||[]).join(', ')||'—'}\nMOTOR: ${(op.motor||[]).join(', ')||'—'}\nAMENAZAS: ${(op.amenazas||[]).join(', ')||'—'}\nOBJETIVOS: ${op.objetivos||'—'}\nCOMBATE: ${[op.met_directo&&'Directo',op.met_indirecto&&'Indirecto',op.met_combinado&&'Combinado'].filter(Boolean).join(' + ')||'—'}\nSOLICITUD DE RECURSOS: ${op.solicitud_recursos?'SÍ'+((op.solicitud_lista||[]).length?' · '+op.solicitud_lista.join(', '):''):'NO'}\n\nFASE: ${op.fase||'—'}${op.contenido_pct?' '+op.contenido_pct+'%':''}\nCONTROL DEL INCENDIO: ${op.fecha_control?fechaCL(op.fecha_control)+' '+op.hora_control:'—'}\nCIERRE DEL INCIDENTE: ${op.fecha_cierre?fechaCL(op.fecha_cierre)+' '+op.hora_cierre:'—'}\nACCIÓN: ${(op.accion||[]).join(', ')||'—'}\nMANDO SCI: ${op.forma_mando||'—'}\nPC: ${op.pc_lugar||'—'}\nÁREA ESPERA: ${op.are_lugar||'—'}\nPAP: ${op.pap_lugar||'—'}\n\nSITUACIÓN AL TRASPASO\nEn camino: ${op.recursos_camino||'—'}\nAsignados: ${op.recursos_asignados||'—'}\nDisponibles: ${op.recursos_disponibles||'—'}\nAvance: ${op.avance_pct?op.avance_pct+'%':'—'}\nProyección: ${op.proyeccion_objetivo||'—'}\nTiempo para el control: ${op.tiempo_control||'—'}\n\nTRASPASO DE MANDO\nEntrega: ${op.mando_entrega||'—'}\nRecibe: ${op.mando_recibe||'—'}\n\nEBF Constitución — ${new Date().toLocaleString('es-CL')}`);window.location.href=`mailto:${emailDest}?subject=${sub}&body=${body}`;setEmailModal(false);}}>📧 Abrir correo</button></div>
       </div></div>}
     <div className="hdr">
       <button className="hdr-back" onClick={cerrar}>←</button>
       <div style={{flex:1,minWidth:0}}><div className="sub">OPERACIÓN ACTIVA</div><h1>{op.nombre||'Nueva operación'}</h1></div>
       <div className="hdr-actions">
+        {!esAppInstalada()&&<button className="hdr-btn" onClick={pantallaCompleta} title="Pantalla completa">⛶</button>}
+        <button className="hdr-btn" onClick={actualizar} title="Actualizar la pantalla">🔄</button>
         <button className="hdr-btn" onClick={save}>💾</button>
         <button className="hdr-btn" onClick={()=>imprimirPDF(op)}>🖨</button>
         <button className="hdr-btn" onClick={()=>setEmailModal(true)}>📧</button>
@@ -664,10 +826,10 @@ function App(){
       </div>
     </div>
     <div className="steps">{PASOS.map((p,i)=><button key={i} className={'step'+(i===paso?' active':i<paso?' done':'')} onClick={()=>setPaso(i)}>{i<paso?'✓':p.icon} {p.label}</button>)}</div>
-    <div className="scroll">{steps[paso]}</div>
+    <div className="scroll" ref={scrollRef} onKeyDown={onKeyScroll} onChange={onChangeScroll} onClick={onClickScroll}>{steps[paso]}</div>
     <div className="nav">
-      <button className="btn btn-ghost btn-sm" onClick={()=>paso>0?setPaso(p=>p-1):cerrar()}>{paso>0?'◀ Anterior':'✕ Cerrar'}</button>
-      {paso<PASOS.length-1?<button className="btn btn-fire btn-sm" onClick={()=>setPaso(p=>p+1)}>Siguiente ▶</button>:<button className="btn btn-green btn-sm" onClick={()=>{persist({...op,estado:'cerrada'});showToast('✅ Cerrada');cerrar();}}>✅ Finalizar</button>}
+      <button className="btn btn-ghost btn-sm" onClick={()=>paso>0?setPaso(p=>p-1):cerrar()}>{paso>0?'◀ Anterior':'← Lista'}</button>
+      {paso<PASOS.length-1?<button className="btn btn-fire btn-sm" onClick={()=>setPaso(p=>p+1)}>Siguiente ▶</button>:<button className="btn btn-green btn-sm" onClick={()=>imprimirPDF(op)}>🖨 PDF</button>}
     </div>
   </div>
 }
