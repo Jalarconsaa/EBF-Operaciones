@@ -174,7 +174,30 @@ function importarRespaldo(file,done){
 
 // ── HELPERS ───────────────────────────────────────────────────────────────
 const toggle=(a,v)=>a.includes(v)?a.filter(x=>x!==v):[...a,v];
-const PUNTOS=['Cabeza','Cola','Flanco Der.','Flanco Izq.','P-1','P-2','P-3','P-4','P-5','P-6'];
+// ── Opciones del formulario ──
+const TIPOS_INCENDIO=['Pastizal','Matorral','Bosque','Rastrojos','Desecho'];
+const LUGARES=['Área de Interfaz','Predio Forestal','Área Urbana'];
+const PROPAGACIONES=['Superficial','Copa','Subterráneo','Pavesas','Escalera'];
+const AMENAZAS=['Estructuras','Personas','Fauna','Otros'];
+const PENDIENTES=['>25% (1/4)','50% (2/4)','75% (3/4)','90%+ (4/4)'];
+// Sectores de la grilla: cada uno con su color. Se guarda el id (compatible con lo ya registrado).
+const SECTORES=[
+  {id:'Cabeza',label:'Cabeza',color:'#dc2626'},{id:'Cola',label:'Cola',color:'#16a34a'},
+  {id:'Flanco Derecho',label:'Flanco Derecho',color:'#ea580c'},{id:'Flanco Izquierdo',label:'Flanco Izquierdo',color:'#0891b2'},
+  {id:'P-1',label:'Punto 1',color:'#2563eb'},{id:'P-2',label:'Punto 2',color:'#7c3aed'},{id:'P-3',label:'Punto 3',color:'#db2777'},
+  {id:'P-4',label:'Punto 4',color:'#ca8a04'},{id:'P-5',label:'Punto 5',color:'#0d9488'},{id:'P-6',label:'Punto 6',color:'#4b5563'},
+];
+const sectorLabel=id=>(SECTORES.find(x=>x.id===id)||{}).label||id;
+// Recursos que se pueden solicitar (se marcan con un clic)
+const SOLICITUD_RECURSOS=[
+  {grupo:'Terrestres',icon:'🚒',color:'#dc2626',items:[{icon:'🚒',label:'Carro Bomba'},{icon:'🚛',label:'Aljibe'},{icon:'🚐',label:'Furgón/Móvil'},{icon:'🛻',label:'Camioneta de Mando'},{icon:'🟩',label:'Brigada Forestal'},{icon:'👷',label:'Cuadrilla Manual'}]},
+  {grupo:'Aéreos',icon:'🚁',color:'#7c3aed',items:[{icon:'🚁',label:'Helicóptero'},{icon:'💧',label:'Helicóptero con Helibalde'},{icon:'✈️',label:'Avión Tanque'},{icon:'🛩️',label:'Avión Observador/Coordinador'},{icon:'📡',label:'Dron'}]},
+  {grupo:'Maquinaria',icon:'🚜',color:'#92400e',items:[{icon:'🚜',label:'Bulldozer'},{icon:'🏗️',label:'Retroexcavadora'},{icon:'🚧',label:'Motoniveladora'},{icon:'🚜',label:'Tractor con arado'}]},
+  {grupo:'Personal',icon:'👨‍🚒',color:'#16a34a',items:[{icon:'👨‍🚒',label:'Personal de Combate'},{icon:'🎖️',label:'Líder de Brigada'},{icon:'🧭',label:'Jefe de Sector'},{icon:'⛑️',label:'Paramédico (SVB)'},{icon:'🔧',label:'Operador de Maquinaria'}]},
+  {grupo:'Apoyo y emergencias',icon:'🚑',color:'#1d4ed8',items:[{icon:'🚑',label:'Ambulancia'},{icon:'🚔',label:'Patrulla Policial'},{icon:'🛡️',label:'Defensa Civil'},{icon:'🏛️',label:'Municipalidad'}]},
+  {grupo:'Logística y mando',icon:'📍',color:'#ea580c',items:[{icon:'🟧',label:'Puesto de Comando'},{icon:'🟡',label:'Área de Espera'},{icon:'🔷',label:'PAP/Abastecimiento'},{icon:'⛽',label:'Camión de Abastecimiento'},{icon:'🔌',label:'Grupo Electrógeno'},{icon:'💡',label:'Torre de Iluminación'},{icon:'📻',label:'Unidad de Comunicaciones'},{icon:'🍞',label:'Alimentación'},{icon:'🛢️',label:'Combustible'}]},
+];
+const iconoRecurso=n=>{const it=SOLICITUD_RECURSOS.flatMap(g=>g.items).find(i=>i.label===n);return it?it.icon:'📌'};
 const INSTITUCIONES=['Bomberos','CONAF','CORMA','Arauco','CMPC','Vista Hermosa','Carabineros','Salud','PDI','Ejército','Armada','Otro'];
 const RECURSOS_TIPOS=[
   {icon:'🚒',label:'Carro Bomba',shape:'circle',color:'#dc2626'},
@@ -206,12 +229,12 @@ function newOp(){return{
   superficie_ini:'',viento:'',motor:[],
   amenazas:[],amenazas_cant_def:'',amenazas_cant_nodef:'',amenazas_obs:'',
   objetivos:'',
-  met_directo:false,met_indirecto:false,
-  ataque_movil:false,puntos_ataque_movil:[],
-  linea_defensa:false,puntos_linea_defensa:[],
-  patrullaje:false,puntos_patrullaje:[],
-  obs_veg:'',triage:null,triage_acciones:[],obs_interfaz:'',
-  solicitud_recursos:false,solicitud_detalle:'',
+  met_directo:false,met_indirecto:false,met_combinado:false,
+  ataque_movil:false,puntos_ataque_movil:[],recursos_ataque_movil:[],
+  linea_defensa:false,puntos_linea_defensa:[],recursos_linea_defensa:[],
+  patrullaje:false,puntos_patrullaje:[],recursos_patrullaje:[],
+  triage:null,triage_acciones:[],recursos_interfaz:[],
+  solicitud_recursos:false,solicitud_lista:[],solicitud_detalle:'',
   fase:'',contenido_pct:'',superficie_fin:'',
   atm_temp:'',atm_viento:'',atm_hr:'',
   accion:[],forma_mando:'',instituciones:[],
@@ -220,13 +243,14 @@ function newOp(){return{
   observaciones:'',bitacora:[],
   recursos_croquis:[],
   mando_entrega:'',mando_recibe:'',
+  recursos_camino:'',avance_pct:'',proyeccion_objetivo:'',proyeccion_obs:'',tiempo_control:'',
   estado:'activa',creada:new Date().toISOString(),
 };}
 
 // ── COMPONENTS ────────────────────────────────────────────────────────────
-function CB({label,checked,onChange,color='#ea580c',small}){
-  return<button className={'cb'+(checked?' on':'')}
-    style={{'--c':color,fontSize:small?'.72rem':'.8rem'}} onClick={onChange}>
+function CB({label,checked,onChange,color='#ea580c',small,disabled}){
+  return<button className={'cb'+(checked?' on':'')} disabled={disabled}
+    style={{'--c':color,fontSize:small?'.72rem':'.8rem',opacity:disabled?.4:1,cursor:disabled?'not-allowed':'pointer'}} onClick={disabled?undefined:onChange}>
     <span>{checked?'☑':'☐'}</span>{label}
   </button>
 }
@@ -237,6 +261,22 @@ function Sec({title,color='fire',children}){
 function Fld({label,children}){
   return<div className="fld"><label className="lbl">{label}</label>{children}</div>
 }
+// Recursos asignados a una táctica: se eligen entre los que hay en escena (croquis / asignados) o se escribe uno
+function AsignarRecursos({valor=[],onChange,disponibles=[],color='#15803d',titulo='Recursos asignados a esta tarea'}){
+  const[nuevo,setNuevo]=useState('');
+  const agregar=t=>{t=(t||'').trim();if(t&&!valor.includes(t))onChange([...valor,t]);setNuevo('')};
+  const porElegir=disponibles.filter(d=>!valor.includes(d.label));
+  return<div style={{marginTop:6,paddingTop:5,borderTop:'1px dashed '+color+'66'}}>
+    <div style={{fontSize:'.68rem',fontWeight:700,color,marginBottom:3}}>🚒 {titulo}:</div>
+    {valor.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:4}}>{valor.map(t=><span key={t} style={{display:'inline-flex',alignItems:'center',gap:4,fontSize:'.75rem',fontWeight:700,padding:'3px 4px 3px 9px',borderRadius:12,background:color+'22',border:'1px solid '+color,color}}>{t}<button onClick={()=>onChange(valor.filter(x=>x!==t))} title="Quitar" style={{border:'none',background:'none',color,fontSize:'1rem',lineHeight:1,padding:'0 5px',cursor:'pointer'}}>×</button></span>)}</div>}
+    {porElegir.length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:4}}>{porElegir.map(d=><button key={d.label} title="Asignar a esta tarea" onClick={()=>agregar(d.label)} style={{fontSize:'.75rem',padding:'5px 10px',borderRadius:12,border:'1px dashed '+color,background:'white',color:'#334155',cursor:'pointer'}}>＋ {d.icon} {d.label}</button>)}</div>}
+    <div style={{display:'flex',gap:4}}>
+      <input value={nuevo} onChange={e=>setNuevo(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')agregar(nuevo)}} placeholder={disponibles.length?'Otro recurso…':'Escribe el recurso (o agrégalos en el Croquis)'} style={{flex:1,minWidth:0,fontSize:'.8rem',border:'1.5px solid #e2e8f0',borderRadius:6,padding:'7px 9px'}}/>
+      {nuevo.trim()&&<button onClick={()=>agregar(nuevo)} style={{border:'none',borderRadius:6,padding:'0 14px',background:color,color:'white',fontWeight:700,fontSize:'1rem',cursor:'pointer'}}>+</button>}
+    </div>
+  </div>
+}
+
 function BitacoraInput({onAdd}){
   const[v,setV]=useState('');
   const add=()=>{if(v.trim()){onAdd(v.trim());setV('')}};
@@ -323,18 +363,24 @@ function Croquis({recursos,onChange}){
 // ── WA + PDF ──────────────────────────────────────────────────────────────
 function buildWA(op){
   const L=(i,k,v)=>v?i+' *'+k+':* '+v+'\n':'';
+  // táctica: sector(es) de la grilla y recursos asignados
+  const tacWA=(on,nombre,pts,recs)=>on?'  ✅ '+nombre+(pts?.length?' → '+pts.map(sectorLabel).join(', '):'')+(recs?.length?' · 🚒 '+recs.join(', '):'')+'\n':'';
   return encodeURIComponent(
     '🧯 *RESUMEN OPERACIONAL EBF*\n━━━━━━━━━━━━━━━\n'+
     '🔥 *'+(op.nombre||'Incidente')+'*\n'+
     L('📋','N°',op.numero)+L('📅','Fecha',op.fecha)+L('⏰','Hora',op.hora)+
     '\n🔎 *EVALUACIÓN*\n'+
-    L('🌲','Tipo',op.tipo_iiff?.join(', '))+L('📍','Lugar',op.lugar?.join(', '))+
+    L('🌲','Tipo de incendio',op.tipo_iiff?.join(', '))+L('📍','Lugar',op.lugar?.join(', '))+
     L('⚡','Motor',op.motor?.join(', '))+L('⚠️','Amenazas',op.amenazas?.join(', '))+
     L('🎯','Objetivos',op.objetivos)+
     '\n⚔️ *TÁCTICAS*\n'+
-    (op.ataque_movil?'  ✅ Ataque móvil'+(op.puntos_ataque_movil?.length?' → '+op.puntos_ataque_movil.join(','):'')+'\n':'')+
-    (op.linea_defensa?'  ✅ Línea defensa'+(op.puntos_linea_defensa?.length?' → '+op.puntos_linea_defensa.join(','):'')+'\n':'')+
-    (op.patrullaje?'  ✅ Patrullaje\n':'')+
+    L('🗡','Combate',[op.met_directo?'Directo':'',op.met_indirecto?'Indirecto':'',op.met_combinado?'Combinado':''].filter(Boolean).join(' + '))+
+    tacWA(op.ataque_movil,'Ataque móvil',op.puntos_ataque_movil,op.recursos_ataque_movil)+
+    tacWA(op.linea_defensa,'Línea de defensa',op.puntos_linea_defensa,op.recursos_linea_defensa)+
+    tacWA(op.patrullaje,'Patrullaje',op.puntos_patrullaje,op.recursos_patrullaje)+
+    L('🏠','Triage estructural',op.triage===true?'SÍ'+((op.triage_acciones||[]).length?' · '+op.triage_acciones.join(', '):''):op.triage===false?'NO':'')+
+    L('🚒','Recursos en interfaz',(op.recursos_interfaz||[]).join(', '))+
+    L('🔧','Solicitud de recursos',op.solicitud_recursos?'SÍ'+((op.solicitud_lista||[]).length?' · '+op.solicitud_lista.join(', '):'')+(op.solicitud_detalle?' — '+op.solicitud_detalle:''):'NO')+
     '\n📊 *SITUACIÓN*\n'+
     L('🚦','Fase',op.fase+(op.contenido_pct?' '+op.contenido_pct+'%':''))+
     L('✅','Acción',op.accion?.join(', '))+L('⚙️','Mando SCI',op.forma_mando)+
@@ -342,6 +388,11 @@ function buildWA(op){
     L('🟧','PC',op.pc_lugar)+L('🟡','Área Espera',op.are_lugar)+L('🔷','PAP',op.pap_lugar)+
     (op.bitacora?.length?'\n📓 *BITÁCORA*\n'+op.bitacora.map(e=>'  🕐 '+e.hora+' — '+e.texto).join('\n')+'\n':'')+
     L('💬','Obs',op.observaciones)+
+    '\n📊 *SITUACIÓN AL TRASPASO*\n'+
+    L('🚚','Recursos en camino',op.recursos_camino)+L('🚒','Recursos asignados',op.recursos_asignados)+L('🚗','Recursos disponibles',op.recursos_disponibles)+
+    L('📈','Avance',op.avance_pct?Math.max(0,Math.min(100,parseFloat(op.avance_pct)||0))+'%':'')+
+    L('🎯','Proyección del objetivo',[op.proyeccion_objetivo,op.proyeccion_obs].filter(Boolean).join(' — '))+
+    L('⏱','Tiempo proyectado para el control',op.tiempo_control)+
     '\n🤝 *TRASPASO DE MANDO*\n'+
     L('📤','Entrega',op.mando_entrega)+L('📥','Recibe',op.mando_recibe)+
     '━━━━━━━━━━━━━━━\n_EBF Constitución · '+new Date().toLocaleString('es-CL')+'_'
@@ -384,20 +435,28 @@ function buildCroquisSVG(recs){
 
 function buildPDFHtml(op){
   const ck=v=>v?'☑':'☐'; const val=v=>v||'—'; const arr=a=>a?.join(', ')||'—';
+  // sector(es) de la grilla y recursos asignados de cada táctica
+  const tac=(key,nombre,pk,rk)=>{const on=op[key];const sec=(op[pk]||[]).map(sectorLabel).join(', ');const rec=(op[rk]||[]).join(', ');
+    return `<div class="it" style="margin-bottom:4px"><b>${ck(on)} ${nombre}</b>${on&&sec?'<br>📍 <b>Sector:</b> '+sec:''}${on&&rec?'<br>🚒 <b>Recursos:</b> '+rec:''}</div>`};
+  const listaSolic=op.solicitud_lista||[];
+  const avance=Math.max(0,Math.min(100,parseFloat(op.avance_pct)||0));
+  const proyCol={Alta:'#16a34a',Media:'#d97706',Baja:'#dc2626'}[op.proyeccion_objetivo]||'#64748b';
   return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
   <style>@page{margin:9mm 8mm;size:A4}*{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}body{font-family:'Segoe UI',Arial,sans-serif;font-size:8pt;color:#1e293b;margin:0;background:#f1f5f9}.hdr{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#ea580c,#c2410c 60%,#9a3412);color:white;padding:10px 16px}.hdr h1{margin:0;font-size:17pt;font-weight:900}.stripe{height:4px;background:linear-gradient(90deg,#fbbf24,#f97316,#ef4444)}.meta{background:#1e293b;color:white;display:grid;grid-template-columns:repeat(4,1fr);margin-bottom:8px}.mc{padding:5px 10px;border-right:1px solid rgba(255,255,255,.08)}.mc .l{font-size:6pt;text-transform:uppercase;opacity:.5}.mc .v{font-size:9pt;font-weight:700;margin-top:1px}.sec{margin-bottom:7px;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1)}.st{color:white;padding:5px 12px;font-size:9pt;font-weight:800}.st.g{background:linear-gradient(135deg,#16a34a,#15803d)}.st.b{background:linear-gradient(135deg,#2563eb,#1d4ed8)}.st.n{background:linear-gradient(135deg,#334155,#1e293b)}.st.m{background:linear-gradient(135deg,#7c3aed,#5b21b6)}.sb{padding:8px 12px;background:white}.g2{display:grid;grid-template-columns:1fr 1fr;gap:5px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px}.it{background:#f8fafc;border-radius:4px;padding:4px 8px;font-size:8pt;border-left:3px solid #cbd5e1}.it b{display:block;font-size:6.5pt;text-transform:uppercase;color:#64748b;margin-bottom:1px}.mando{background:linear-gradient(135deg,#14532d,#166534);color:white;border-radius:6px;padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:8px}.ml{font-size:6.5pt;text-transform:uppercase;opacity:.6;margin-bottom:3px}.mn{font-size:12pt;font-weight:900;border-bottom:1px solid rgba(255,255,255,.2);padding-bottom:5px}.mf{height:26px;border-bottom:1px dashed rgba(255,255,255,.25);margin-top:4px}.footer{margin-top:8px;display:flex;justify-content:space-between;font-size:6.5pt;color:#94a3b8;border-top:2px solid #e2e8f0;padding-top:5px}</style></head><body>
   <div class="hdr"><div style="font-size:28pt">🧯</div><div style="flex:1"><div style="font-size:7pt;opacity:.8">RESUMEN OPERACIONAL · PRIMER RESPONDEDOR FORESTAL</div><h1>${val(op.nombre)}</h1></div><div style="text-align:right"><div style="font-size:6pt;opacity:.6;text-transform:uppercase">N° Operación</div><div style="font-size:18pt;font-weight:900">${val(op.numero)}</div></div></div>
   <div class="stripe"></div>
   <div class="meta"><div class="mc"><div class="l">📅 Fecha</div><div class="v">${val(op.fecha)}</div></div><div class="mc"><div class="l">⏰ Hora</div><div class="v">${val(op.hora)}</div></div><div class="mc"><div class="l">🚦 Fase</div><div class="v">${val(op.fase)}${op.contenido_pct?' '+op.contenido_pct+'%':''}</div></div><div class="mc"><div class="l">✅ Estado</div><div class="v">${val(op.estado)}</div></div></div>
   <div class="sec"><div class="st g">🔥 EVALUACIÓN INICIAL</div><div class="sb">
-  <div class="g3" style="margin-bottom:5px"><div class="it"><b>A · Tipo IIFF</b>${['Pastizal','Matorral','Bosque'].map(v=>`${ck(op.tipo_iiff?.includes(v))} ${v}`).join(' ')}</div><div class="it"><b>B · Lugar</b>${['Área de Interfaz','Predio Forestal','Área Urbana'].map(v=>`${ck(op.lugar?.includes(v))} ${v}`).join(' · ')}</div><div class="it"><b>C · Propagación</b>${['Superficial','Copa','Subterráneo'].map(v=>`${ck(op.propagacion?.includes(v))} ${v}`).join(' · ')}</div></div>
-  <div class="g4" style="margin-bottom:5px"><div class="it"><b>D · Terreno</b>${arr(op.terreno)}</div><div class="it"><b>E · Sup. ini.</b>${val(op.superficie_ini)} m²</div><div class="it"><b>F · Viento</b>${val(op.viento)}</div><div class="it"><b>G · Motor</b>${arr(op.motor)}</div></div>
+  <div class="g3" style="margin-bottom:5px"><div class="it"><b>A · Tipo de Incendio</b>${TIPOS_INCENDIO.map(v=>`${ck(op.tipo_iiff?.includes(v))} ${v}`).join('<br>')}</div><div class="it"><b>B · Lugar donde ocurre</b>${LUGARES.map(v=>`${ck(op.lugar?.includes(v))} ${v}`).join(' · ')}</div><div class="it"><b>C · Propagación</b>${PROPAGACIONES.map(v=>`${ck(op.propagacion?.includes(v))} ${v}`).join(' · ')}</div></div>
+  <div class="g4" style="margin-bottom:5px"><div class="it"><b>D · Terreno</b>${arr(op.terreno)}${op.terreno?.includes('Pendiente')&&op.pendiente?.length?'<br><i>'+op.pendiente.join(', ')+'</i>':''}</div><div class="it"><b>E · Sup. ini.</b>${val(op.superficie_ini)} m²</div><div class="it"><b>F · Viento</b>${val(op.viento)}</div><div class="it"><b>G · Motor</b>${arr(op.motor)}</div></div>
   <div class="it" style="margin-bottom:5px"><b>H · Amenazas</b> ${arr(op.amenazas)} ${op.amenazas?.includes('Estructuras')?` · Def:${val(op.amenazas_cant_def)} No def:${val(op.amenazas_cant_nodef)}`:''}</div>
   <div class="it" style="margin-bottom:5px"><b>I · Objetivos</b> ${val(op.objetivos)}</div>
-  <div class="g2" style="margin-bottom:5px"><div class="it"><b>⚔️ Combate</b> ${ck(op.met_directo)} Directo ${ck(op.met_indirecto)} Indirecto</div><div class="it"><b>K · Solicitud</b> ${op.solicitud_recursos?'SÍ — '+val(op.solicitud_detalle):'NO'}</div></div>
-  ${op.ataque_movil?`<div class="it" style="margin-bottom:4px"><b>✅ Ataque móvil</b>${op.puntos_ataque_movil?.length?' → '+op.puntos_ataque_movil.join(', '):''}</div>`:''}
-  ${op.linea_defensa?`<div class="it" style="margin-bottom:4px"><b>✅ Línea de defensa</b>${op.puntos_linea_defensa?.length?' → '+op.puntos_linea_defensa.join(', '):''}</div>`:''}
-  <div class="it"><b>🏠 Triage</b> ${op.triage===true?'SÍ':op.triage===false?'NO':'—'} ${op.triage_acciones?.length?'· '+op.triage_acciones.join(' · '):''}</div>
+  <div class="it" style="margin-bottom:5px"><b>⚔️ Tipo de combate</b> ${ck(op.met_directo)} Directo &nbsp; ${ck(op.met_indirecto)} Indirecto &nbsp; ${ck(op.met_combinado)} Combinado</div>
+  ${tac('ataque_movil','Ataque móvil (Línea húmeda)','puntos_ataque_movil','recursos_ataque_movil')}
+  ${tac('linea_defensa','Línea de defensa (manual)','puntos_linea_defensa','recursos_linea_defensa')}
+  ${tac('patrullaje','Patrullaje','puntos_patrullaje','recursos_patrullaje')}
+  <div class="it" style="margin-bottom:5px"><b>🏠 Triage estructural</b> ${op.triage===true?'SÍ':op.triage===false?'NO':'—'} ${op.triage_acciones?.length?'· '+op.triage_acciones.join(' · '):''}${(op.recursos_interfaz||[]).length?'<br>🚒 <b>Recursos:</b> '+op.recursos_interfaz.join(', '):''}</div>
+  <div class="it"><b>K · Solicitud de Recursos: ${op.solicitud_recursos?'SÍ':'NO'}</b>${op.solicitud_recursos&&listaSolic.length?'<br>'+listaSolic.map(n=>`<span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 7px;border-radius:10px;background:#f1f5f9;border:1px solid #cbd5e1">${iconoRecurso(n)} ${n}</span>`).join(''):''}${op.solicitud_recursos&&op.solicitud_detalle?'<br><i>'+op.solicitud_detalle+'</i>':''}</div>
   </div></div>
   <div class="sec"><div class="st b">📋 INFORMACIÓN COMPLEMENTARIA</div><div class="sb">
   <div class="g4" style="margin-bottom:5px"><div class="it"><b>L · Fase</b>${val(op.fase)}${op.contenido_pct?' '+op.contenido_pct+'%':''}</div><div class="it"><b>M · Sup. fin.</b>${val(op.superficie_fin)} m²</div><div class="it"><b>N · Meteo</b>🌡${val(op.atm_temp)}°C 💨${val(op.atm_viento)} 💧${val(op.atm_hr)}%</div><div class="it"><b>O · Acción</b>${arr(op.accion)}</div></div>
@@ -407,6 +466,11 @@ function buildPDFHtml(op){
   </div></div>
   ${op.bitacora?.length?`<div class="sec"><div class="st n">📓 BITÁCORA</div><div class="sb" style="padding:0"><table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#334155;color:white;padding:4px 10px;font-size:7pt;width:55px">Hora</th><th style="background:#334155;color:white;padding:4px 10px;font-size:7pt;text-align:left">Entrada</th></tr></thead><tbody>${op.bitacora.map((e,i)=>`<tr style="background:${i%2?'#f8fafc':'white'}"><td style="padding:4px 10px;font-size:8pt;font-weight:700;color:#2563eb;font-family:monospace;text-align:center">${e.hora}</td><td style="padding:4px 10px;font-size:8pt">${e.texto}</td></tr>`).join('')}</tbody></table></div></div>`:''}
   <div class="sec"><div class="st m">🗺 CROQUIS — DIVISIÓN DEL INCENDIO</div><div class="sb" style="padding:6px">${buildCroquisSVG(op.recursos_croquis)}</div></div>
+  <div class="sec"><div class="st" style="background:linear-gradient(135deg,#d97706,#b45309)">📊 SITUACIÓN AL MOMENTO DEL TRASPASO</div><div class="sb">
+  <div class="g3" style="margin-bottom:5px"><div class="it"><b>🚚 Recursos en camino</b>${val(op.recursos_camino)}</div><div class="it"><b>🚒 Recursos asignados</b>${val(op.recursos_asignados)}</div><div class="it"><b>🚗 Recursos disponibles</b>${val(op.recursos_disponibles)}</div></div>
+  <div class="it" style="margin-bottom:5px"><b>📈 % de avance</b><div style="display:flex;align-items:center;gap:8px;margin-top:3px"><div style="flex:1;height:10px;background:#e2e8f0;border-radius:6px;overflow:hidden"><div style="width:${avance}%;height:10px;background:linear-gradient(90deg,#16a34a,#84cc16)"></div></div><span style="font-size:10pt;font-weight:800;color:#166534">${op.avance_pct?avance+'%':'—'}</span></div></div>
+  <div class="g2"><div class="it" style="border-left-color:${proyCol}"><b>🎯 Proyección de cumplimiento del objetivo</b><span style="font-weight:800;color:${proyCol}">${val(op.proyeccion_objetivo)}</span>${op.proyeccion_obs?' — '+op.proyeccion_obs:''}</div><div class="it"><b>⏱ Tiempo proyectado para el control</b><span style="font-weight:800">${val(op.tiempo_control)}</span></div></div>
+  </div></div>
   <div class="mando"><div><div class="ml">📤 Entrega el mando</div><div class="mn">${val(op.mando_entrega)}</div><div class="mf"></div><div style="font-size:6pt;opacity:.4;margin-top:2px">Firma / RUT</div></div><div><div class="ml">📥 Recibe el mando</div><div class="mn">${val(op.mando_recibe)}</div><div class="mf"></div><div style="font-size:6pt;opacity:.4;margin-top:2px">Firma / RUT</div></div></div>
   <div class="footer"><span>🧯 EBF Constitución</span><span>${new Date().toLocaleString('es-CL')}</span></div>
   </body></html>`;
@@ -460,7 +524,7 @@ function App(){
 
   const s=(k,v)=>persist({...op,[k]:v});
   const nueva=()=>{setOp(newOp());setPaso(0)};
-  const abrir=o=>{setOp(o);setPaso(0)};
+  const abrir=o=>{setOp({...newOp(),...o});setPaso(0)};
   const cerrar=()=>setOp(null);
   const del=async id=>{const l=ops.filter(o=>o.id!==id);setOps(l);if(op?.id===id)setOp(null);await dbDelOp(id);};
   const save=async()=>{await persist({...op});showToast('💾 Guardado');};
@@ -471,7 +535,7 @@ function App(){
 
   if(!op)return<div id="app">
     {toast&&<div className="toast">{toast}</div>}
-    <div className="hdr"><div style={{flex:1}}><div className="sub">PRIMER RESPONDEDOR FORESTAL · v3 (18-nov)</div><h1 style={{fontSize:'1.1rem'}}>🧯 EBF Operaciones</h1></div><div className="hdr-actions"><button className="hdr-btn" onClick={exportarRespaldo} title="Guardar respaldo">📤</button><label className="hdr-btn" style={{cursor:'pointer'}} title="Restaurar respaldo">📥<input type="file" accept=".json,application/json" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f)importarRespaldo(f,n=>{dbLoadOps().then(setOps);showToast(n<0?'⚠️ Archivo no válido':'📥 '+n+' operación(es) restauradas')});e.target.value=''}}/></label><button className="hdr-btn" onClick={nueva}>+ Nueva</button></div></div>
+    <div className="hdr"><div style={{flex:1}}><div className="sub">PRIMER RESPONDEDOR FORESTAL · v4 (21-nov)</div><h1 style={{fontSize:'1.1rem'}}>🧯 EBF Operaciones</h1></div><div className="hdr-actions"><button className="hdr-btn" onClick={exportarRespaldo} title="Guardar respaldo">📤</button><label className="hdr-btn" style={{cursor:'pointer'}} title="Restaurar respaldo">📥<input type="file" accept=".json,application/json" style={{display:'none'}} onChange={e=>{const f=e.target.files[0];if(f)importarRespaldo(f,n=>{dbLoadOps().then(setOps);showToast(n<0?'⚠️ Archivo no válido':'📥 '+n+' operación(es) restauradas')});e.target.value=''}}/></label><button className="hdr-btn" onClick={nueva}>+ Nueva</button></div></div>
     <div className="scroll">
       {ops.length===0?<div className="empty"><div style={{fontSize:'3rem',marginBottom:12}}>🔥</div><p>Sin operaciones</p><p style={{fontSize:'.8rem',marginTop:6}}>Toca "+ Nueva" para comenzar</p></div>
       :ops.map(o=><div key={o.id} className={'op-item '+(o.estado==='cerrada'?'cerrada':'')}>
@@ -483,38 +547,57 @@ function App(){
     </div>
   </div>;
 
+  const avancePct=Math.max(0,Math.min(100,parseFloat(op.avance_pct)||0));
+  // Recursos que se pueden asignar a una táctica: los del croquis + los escritos en «Recursos asignados»
+  const recursosDisp=(()=>{const m=new Map();
+    (op.recursos_croquis||[]).forEach(r=>{const k=String(r.label||'').trim();if(k&&!m.has(k))m.set(k,{label:k,icon:r.shape==='pc'?'🟧':r.shape==='are'?'🟡':r.shape==='pap'?'🔷':(r.icon||'📍')})});
+    String(op.recursos_asignados||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean).forEach(k=>{if(!m.has(k))m.set(k,{label:k,icon:'🚒'})});
+    return [...m.values()]})();
   const steps=[
   <div style={{display:'flex',flexDirection:'column',gap:9}}>
     <div className="card"><div className="card-body" style={{gap:7}}>
       <Fld label="Nombre del incidente"><input {...inp} value={op.nombre} onChange={e=>s('nombre',e.target.value)} placeholder="Incendio Forestal Loma Limpia…" style={{...inp.style,fontWeight:700,fontSize:'1rem'}}/></Fld>
       <div className="row3"><Fld label="N° Op."><input {...inp} value={op.numero} onChange={e=>s('numero',e.target.value)}/></Fld><Fld label="Fecha"><input {...inp} type="date" value={op.fecha} onChange={e=>s('fecha',e.target.value)}/></Fld><Fld label="Hora"><input {...inp} type="time" value={op.hora} onChange={e=>s('hora',e.target.value)}/></Fld></div>
     </div></div>
-    <Sec title="A · Tipo IIFF" color="fire"><div className="cb-wrap">{['Pastizal','Matorral','Bosque'].map(v=><CB key={v} label={v} checked={op.tipo_iiff.includes(v)} onChange={()=>s('tipo_iiff',toggle(op.tipo_iiff,v))} color="#16a34a"/>)}</div></Sec>
-    <Sec title="B · Lugar" color="fire"><div className="cb-wrap">{['Área de Interfaz','Predio Forestal','Área Urbana'].map(v=><CB key={v} label={v} checked={op.lugar.includes(v)} onChange={()=>s('lugar',toggle(op.lugar,v))} color="#16a34a"/>)}</div></Sec>
-    <Sec title="C · Propagación" color="fire"><div className="cb-wrap">{['Superficial','Copa','Subterráneo'].map(v=><CB key={v} label={v} checked={op.propagacion.includes(v)} onChange={()=>s('propagacion',toggle(op.propagacion,v))} color="#16a34a"/>)}</div></Sec>
-    <Sec title="D · Terreno" color="fire"><div className="cb-wrap" style={{marginBottom:5}}>{['Plano','Pendiente','Quebrada','Otro'].map(v=><CB key={v} label={v} checked={op.terreno.includes(v)} onChange={()=>s('terreno',toggle(op.terreno,v))} color="#16a34a"/>)}</div><div className="cb-wrap">{['>25% (1/4)','50% (2/4)','75% (3/4)','90%+ (4/4)'].map(v=><CB key={v} label={v} small checked={op.pendiente.includes(v)} onChange={()=>s('pendiente',toggle(op.pendiente,v))} color="#6b7280"/>)}</div></Sec>
+    <Sec title="A · Tipo de Incendio" color="fire"><div className="cb-wrap">{TIPOS_INCENDIO.map(v=><CB key={v} label={v} checked={op.tipo_iiff.includes(v)} onChange={()=>s('tipo_iiff',toggle(op.tipo_iiff,v))} color="#16a34a"/>)}</div></Sec>
+    <Sec title="B · Lugar donde ocurre" color="fire"><div className="cb-wrap">{LUGARES.map(v=><CB key={v} label={v} checked={op.lugar.includes(v)} onChange={()=>s('lugar',toggle(op.lugar,v))} color="#16a34a"/>)}</div></Sec>
+    <Sec title="C · Propagación" color="fire"><div className="cb-wrap">{PROPAGACIONES.map(v=><CB key={v} label={v} checked={op.propagacion.includes(v)} onChange={()=>s('propagacion',toggle(op.propagacion,v))} color="#16a34a"/>)}</div></Sec>
+    <Sec title="D · Terreno" color="fire"><div className="cb-wrap" style={{marginBottom:5}}>{['Plano','Pendiente','Quebrada','Otro'].map(v=><CB key={v} label={v} checked={op.terreno.includes(v)} onChange={()=>{const t=toggle(op.terreno,v);persist({...op,terreno:t,pendiente:t.includes('Pendiente')?op.pendiente:[]})}} color="#16a34a"/>)}</div><div style={{fontSize:'.68rem',color:'#6b7280',marginBottom:3}}>% de pendiente{op.terreno.includes('Pendiente')?'':' (se activa al marcar «Pendiente»)'}</div><div className="cb-wrap">{PENDIENTES.map(v=><CB key={v} label={v} small disabled={!op.terreno.includes('Pendiente')} checked={op.pendiente.includes(v)} onChange={()=>s('pendiente',toggle(op.pendiente,v))} color="#6b7280"/>)}</div></Sec>
     <div className="row2">
       <Sec title="E · Sup. ini." color="fire"><input {...inp} value={op.superficie_ini} onChange={e=>s('superficie_ini',e.target.value)} placeholder="m²"/></Sec>
       <Sec title="F · Viento" color="fire"><div className="cb-wrap">{['Leve','Moderado','Fuerte'].map(v=><CB key={v} label={v} checked={op.viento===v} onChange={()=>s('viento',op.viento===v?'':v)} color="#16a34a"/>)}</div></Sec>
     </div>
     <Sec title="G · Motor" color="fire"><div className="cb-wrap">{['Viento','Pendiente','Combustible'].map(v=><CB key={v} label={v} checked={op.motor.includes(v)} onChange={()=>s('motor',toggle(op.motor,v))} color="#16a34a"/>)}</div></Sec>
-    <Sec title="H · Amenazas" color="fire"><div className="cb-wrap" style={{marginBottom:5}}>{['Estructuras','Personas','Fauna','Infraestructura','Otros'].map(v=><CB key={v} label={v} checked={op.amenazas.includes(v)} onChange={()=>s('amenazas',toggle(op.amenazas,v))} color="#dc2626"/>)}</div>
+    <Sec title="H · Amenazas" color="fire"><div className="cb-wrap" style={{marginBottom:5}}>{AMENAZAS.map(v=><CB key={v} label={v} checked={op.amenazas.includes(v)} onChange={()=>s('amenazas',toggle(op.amenazas,v))} color="#dc2626"/>)}</div>
       {op.amenazas.includes('Estructuras')&&<div className="row2" style={{marginBottom:5}}><Fld label="Def."><input {...inp} type="number" value={op.amenazas_cant_def} onChange={e=>s('amenazas_cant_def',e.target.value)}/></Fld><Fld label="No Def."><input {...inp} type="number" value={op.amenazas_cant_nodef} onChange={e=>s('amenazas_cant_nodef',e.target.value)}/></Fld></div>}
       <input {...inp} value={op.amenazas_obs} onChange={e=>s('amenazas_obs',e.target.value)} placeholder="Observaciones amenazas…"/></Sec>
     <Sec title="I · Objetivos" color="fire"><textarea {...inp} rows={3} value={op.objetivos} onChange={e=>s('objetivos',e.target.value)} placeholder="Detener el avance en… dentro de los próximos…"/></Sec>
-    <Sec title="K · Solicitud de Recursos" color="fire"><div className="cb-wrap" style={{marginBottom:5}}><CB label="NO" checked={!op.solicitud_recursos} onChange={()=>s('solicitud_recursos',false)} color="#16a34a"/><CB label="SÍ" checked={op.solicitud_recursos} onChange={()=>s('solicitud_recursos',true)} color="#dc2626"/></div>{op.solicitud_recursos&&<input {...inp} value={op.solicitud_detalle} onChange={e=>s('solicitud_detalle',e.target.value)} placeholder="¿Cuáles? Ej: 1 Aljibe, 2 BF…"/>}</Sec>
+    <Sec title="K · Solicitud de Recursos" color="fire">
+      <div className="cb-wrap" style={{marginBottom:5,alignItems:'center'}}>
+        <CB label="NO" checked={!op.solicitud_recursos} onChange={()=>s('solicitud_recursos',false)} color="#16a34a"/>
+        <CB label="SÍ" checked={op.solicitud_recursos} onChange={()=>s('solicitud_recursos',true)} color="#dc2626"/>
+        {op.solicitud_recursos&&<span style={{fontSize:'.75rem',fontWeight:700,color:'#b91c1c'}}>{(op.solicitud_lista||[]).length} marcado(s)</span>}
+        {op.solicitud_recursos&&(op.solicitud_lista||[]).length>0&&<button onClick={()=>s('solicitud_lista',[])} style={{fontSize:'.7rem',border:'1px solid #ddd',background:'white',borderRadius:6,padding:'4px 10px',color:'#64748b'}}>Limpiar</button>}
+      </div>
+      {op.solicitud_recursos&&<div style={{display:'flex',flexDirection:'column',gap:9}}>
+        {SOLICITUD_RECURSOS.map(g=><div key={g.grupo}>
+          <div style={{fontSize:'.68rem',fontWeight:800,color:g.color,textTransform:'uppercase',marginBottom:3}}>{g.icon} {g.grupo}</div>
+          <div className="cb-wrap">{g.items.map(it=><CB key={it.label} small label={it.icon+' '+it.label} color={g.color} checked={(op.solicitud_lista||[]).includes(it.label)} onChange={()=>s('solicitud_lista',toggle(op.solicitud_lista||[],it.label))}/>)}</div>
+        </div>)}
+        <input {...inp} value={op.solicitud_detalle||''} onChange={e=>s('solicitud_detalle',e.target.value)} placeholder="Observación (opcional)…"/>
+      </div>}
+    </Sec>
   </div>,
   <div style={{display:'flex',flexDirection:'column',gap:9}}>
-    <Sec title="Tipo de combate" color="blue"><div className="cb-wrap"><CB label="Directo" checked={op.met_directo} onChange={()=>s('met_directo',!op.met_directo)} color="#2563eb"/><CB label="Indirecto" checked={op.met_indirecto} onChange={()=>s('met_indirecto',!op.met_indirecto)} color="#7c3aed"/></div></Sec>
+    <Sec title="Tipo de combate" color="blue"><div className="cb-wrap"><CB label="Directo" checked={op.met_directo} onChange={()=>s('met_directo',!op.met_directo)} color="#2563eb"/><CB label="Indirecto" checked={op.met_indirecto} onChange={()=>s('met_indirecto',!op.met_indirecto)} color="#7c3aed"/><CB label="Combinado" checked={!!op.met_combinado} onChange={()=>s('met_combinado',!op.met_combinado)} color="#0f766e"/></div></Sec>
     <Sec title="🌿 IIFF Vegetación Común" color="blue">
-      {[{k:'ataque_movil',pk:'puntos_ataque_movil',l:'Ataque móvil (Línea húmeda)'},{k:'linea_defensa',pk:'puntos_linea_defensa',l:'Línea de defensa (manual)'},{k:'patrullaje',pk:'puntos_patrullaje',l:'Patrullaje'}].map(({k,pk,l})=><div key={k} style={{marginBottom:7}}><CB label={l} checked={!!op[k]} onChange={()=>s(k,!op[k])} color="#15803d"/>{op[k]&&<div style={{marginTop:4,marginLeft:6,background:'#f0fdf4',borderRadius:5,padding:'5px 8px',border:'1px solid #bbf7d0'}}><div style={{fontSize:'.7rem',fontWeight:700,color:'#166534',marginBottom:3}}>📍 Sector en grilla:</div><div className="cb-wrap">{PUNTOS.map(v=><CB key={v} label={v} small checked={(op[pk]||[]).includes(v)} onChange={()=>s(pk,toggle(op[pk]||[],v))} color="#166534"/>)}</div></div>}</div>)}
-      <Fld label="OBS"><input {...inp} value={op.obs_veg||''} onChange={e=>s('obs_veg',e.target.value)} placeholder="Observaciones…"/></Fld>
+      {[{k:'ataque_movil',pk:'puntos_ataque_movil',rk:'recursos_ataque_movil',l:'Ataque móvil (Línea húmeda)'},{k:'linea_defensa',pk:'puntos_linea_defensa',rk:'recursos_linea_defensa',l:'Línea de defensa (manual)'},{k:'patrullaje',pk:'puntos_patrullaje',rk:'recursos_patrullaje',l:'Patrullaje'}].map(({k,pk,rk,l})=><div key={k} style={{marginBottom:7}}><CB label={l} checked={!!op[k]} onChange={()=>s(k,!op[k])} color="#15803d"/>{op[k]&&<div style={{marginTop:4,marginLeft:6,background:'#f0fdf4',borderRadius:5,padding:'5px 8px',border:'1px solid #bbf7d0'}}><div style={{fontSize:'.7rem',fontWeight:700,color:'#166534',marginBottom:3}}>📍 Sector en grilla:</div><div className="cb-wrap">{SECTORES.map(sc=><CB key={sc.id} label={sc.label} small color={sc.color} checked={(op[pk]||[]).includes(sc.id)} onChange={()=>s(pk,toggle(op[pk]||[],sc.id))}/>)}</div><AsignarRecursos valor={op[rk]||[]} onChange={v=>s(rk,v)} disponibles={recursosDisp} color="#166534"/></div>}</div>)}
     </Sec>
     <Sec title="🏠 IIFF Interfaz — Triage" color="amber">
       <div className="cb-wrap" style={{marginBottom:7}}><CB label="SÍ" checked={op.triage===true} onChange={()=>s('triage',true)} color="#c2410c"/><CB label="NO" checked={op.triage===false} onChange={()=>s('triage',false)} color="#16a34a"/></div>
       {op.triage===true&&op.amenazas.includes('Estructuras')&&<div className="row2" style={{marginBottom:7}}><Fld label="Defendibles"><input {...inp} type="number" value={op.amenazas_cant_def} onChange={e=>s('amenazas_cant_def',e.target.value)}/></Fld><Fld label="No Defendibles"><input {...inp} type="number" value={op.amenazas_cant_nodef} onChange={e=>s('amenazas_cant_nodef',e.target.value)}/></Fld></div>}
       <div className="cb-wrap" style={{marginBottom:5}}>{['Analizar y seguir','Preparar y seguir','Preparar y defender','Atacar y correr','Seguir el frente','Mant. reservas'].map(v=><CB key={v} label={v} small checked={(op.triage_acciones||[]).includes(v)} onChange={()=>s('triage_acciones',toggle(op.triage_acciones||[],v))} color="#c2410c"/>)}</div>
-      <Fld label="OBS Interfaz"><input {...inp} value={op.obs_interfaz||''} onChange={e=>s('obs_interfaz',e.target.value)} placeholder="Observaciones…"/></Fld>
+      {(op.triage===true||(op.triage_acciones||[]).length>0)&&<AsignarRecursos valor={op.recursos_interfaz||[]} onChange={v=>s('recursos_interfaz',v)} disponibles={recursosDisp} color="#c2410c" titulo="Recursos asignados a interfaz"/>}
     </Sec>
   </div>,
   <div style={{display:'flex',flexDirection:'column',gap:9}}>
@@ -541,7 +624,22 @@ function App(){
       <Fld label={<span style={{color:'rgba(255,255,255,.6)'}}>Entrega el mando</span>}><input style={{...inp.style,background:'rgba(255,255,255,.12)',border:'1px solid rgba(255,255,255,.2)',color:'white',fontWeight:700}} value={op.mando_entrega} onChange={e=>s('mando_entrega',e.target.value)} placeholder="Nombre y cargo…"/></Fld>
       <Fld label={<span style={{color:'rgba(255,255,255,.6)'}}>Recibe el mando</span>}><input style={{...inp.style,background:'rgba(255,255,255,.12)',border:'1px solid rgba(255,255,255,.2)',color:'white',fontWeight:700}} value={op.mando_recibe} onChange={e=>s('mando_recibe',e.target.value)} placeholder="Nombre y cargo…"/></Fld>
     </div>
-    <div className="card"><div className="card-hdr navy">Resumen rápido</div><div className="card-body"><div className="row2" style={{gap:4}}>{[['Incidente',op.nombre||'—'],['N°',op.numero||'—'],['Fecha',op.fecha],['Fase',op.fase||(op.contenido_pct?op.contenido_pct+'%':'—')],['Motor',(op.motor||[]).join(', ')||'—'],['Acción',(op.accion||[]).join(', ')||'—']].map(([k,v])=><div key={k} style={{background:'#f8fafc',borderRadius:4,padding:'4px 7px',border:'1px solid #e2e8f0'}}><div style={{fontSize:'.65rem',fontWeight:700,color:'#9ca3af',textTransform:'uppercase'}}>{k}</div><div style={{fontWeight:600,fontSize:'.85rem'}}>{v}</div></div>)}</div></div></div>
+    <Sec title="📊 Situación al momento del traspaso" color="amber">
+      <Fld label="🚚 Recursos en camino"><textarea {...inp} rows={2} value={op.recursos_camino||''} onChange={e=>s('recursos_camino',e.target.value)} placeholder="Ej: BF-6 llega en 20 min…"/></Fld>
+      <Fld label="🚒 Recursos asignados"><textarea {...inp} rows={2} value={op.recursos_asignados||''} onChange={e=>s('recursos_asignados',e.target.value)} placeholder="BF4, B5, Arauco…"/></Fld>
+      <Fld label="🚗 Recursos disponibles"><textarea {...inp} rows={2} value={op.recursos_disponibles||''} onChange={e=>s('recursos_disponibles',e.target.value)} placeholder="Z5, BT1…"/></Fld>
+      <div className="fld"><label className="lbl">📈 % de avance</label>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <input {...inp} type="number" min="0" max="100" style={{...inp.style,width:80}} value={op.avance_pct||''} onChange={e=>s('avance_pct',e.target.value)} placeholder="0-100"/>
+          <div style={{flex:1,height:14,background:'#e2e8f0',borderRadius:7,overflow:'hidden'}}><div style={{width:avancePct+'%',height:'100%',background:'linear-gradient(90deg,#16a34a,#84cc16)'}}/></div>
+          <b style={{minWidth:40,textAlign:'right',color:'#166534'}}>{avancePct}%</b>
+        </div></div>
+      <div className="fld"><label className="lbl">🎯 Proyección de cumplimiento del objetivo</label>
+        <div className="cb-wrap">{[['Alta','#16a34a'],['Media','#d97706'],['Baja','#dc2626']].map(([v,c])=><CB key={v} label={v} color={c} checked={op.proyeccion_objetivo===v} onChange={()=>s('proyeccion_objetivo',op.proyeccion_objetivo===v?'':v)}/>)}</div>
+        <input {...inp} style={{...inp.style,marginTop:5}} value={op.proyeccion_obs||''} onChange={e=>s('proyeccion_obs',e.target.value)} placeholder="Fundamento (ej: viento a favor…)"/></div>
+      <Fld label="⏱ Tiempo proyectado para el control"><input {...inp} value={op.tiempo_control||''} onChange={e=>s('tiempo_control',e.target.value)} placeholder="Ej: 3 h 30 min"/></Fld>
+    </Sec>
+    <div className="card"><div className="card-hdr navy">Resumen rápido</div><div className="card-body"><div className="row2" style={{gap:4}}>{[['Incidente',op.nombre||'—'],['N°',op.numero||'—'],['Fecha',op.fecha],['Fase',op.fase||(op.contenido_pct?op.contenido_pct+'%':'—')],['Motor',(op.motor||[]).join(', ')||'—'],['Acción',(op.accion||[]).join(', ')||'—'],['% avance',op.avance_pct?avancePct+'%':'—'],['Proyección',op.proyeccion_objetivo||'—'],['Control en',op.tiempo_control||'—'],['En camino',op.recursos_camino||'—']].map(([k,v])=><div key={k} style={{background:'#f8fafc',borderRadius:4,padding:'4px 7px',border:'1px solid #e2e8f0'}}><div style={{fontSize:'.65rem',fontWeight:700,color:'#9ca3af',textTransform:'uppercase'}}>{k}</div><div style={{fontWeight:600,fontSize:'.85rem'}}>{v}</div></div>)}</div></div></div>
     <button className="btn btn-green" style={{width:'100%',padding:12}} onClick={()=>{persist({...op,estado:'cerrada'});showToast('✅ Operación cerrada');cerrar();}}>✅ Cerrar operación</button>
   </div>,
   ];
@@ -553,7 +651,7 @@ function App(){
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <div className="modal-title">📧 Enviar por Email</div>
         <Fld label="Destinatario"><input value={emailDest} onChange={e=>setEmailDest(e.target.value)} placeholder="nombre@correo.cl" style={{width:'100%',padding:'9px 10px',border:'1.5px solid #e2e8f0',borderRadius:6,fontSize:'.88rem'}}/></Fld>
-        <div style={{display:'flex',gap:8,marginTop:12}}><button className="btn btn-ghost" style={{flex:1}} onClick={()=>setEmailModal(false)}>Cancelar</button><button className="btn" style={{flex:1,background:'#1d4ed8',color:'white'}} onClick={()=>{const sub=encodeURIComponent(`[EBF Constitución] Resumen Operacional — ${op.nombre||'Incidente'} ${op.fecha}`);const body=encodeURIComponent(`RESUMEN OPERACIONAL EBF CONSTITUCIÓN\n=====================================\nIncidente: ${op.nombre||'—'}  N°: ${op.numero||'—'}\nFecha: ${op.fecha}  Hora: ${op.hora}\n\nTIPO IIFF: ${(op.tipo_iiff||[]).join(', ')||'—'}\nLUGAR: ${(op.lugar||[]).join(', ')||'—'}\nMOTOR: ${(op.motor||[]).join(', ')||'—'}\nAMENAZAS: ${(op.amenazas||[]).join(', ')||'—'}\nOBJETIVOS: ${op.objetivos||'—'}\n\nFASE: ${op.fase||'—'}${op.contenido_pct?' '+op.contenido_pct+'%':''}\nACCIÓN: ${(op.accion||[]).join(', ')||'—'}\nMANDO SCI: ${op.forma_mando||'—'}\nPC: ${op.pc_lugar||'—'}\nÁREA ESPERA: ${op.are_lugar||'—'}\nPAP: ${op.pap_lugar||'—'}\n\nTRASPASO DE MANDO\nEntrega: ${op.mando_entrega||'—'}\nRecibe: ${op.mando_recibe||'—'}\n\nEBF Constitución — ${new Date().toLocaleString('es-CL')}`);window.location.href=`mailto:${emailDest}?subject=${sub}&body=${body}`;setEmailModal(false);}}>📧 Abrir correo</button></div>
+        <div style={{display:'flex',gap:8,marginTop:12}}><button className="btn btn-ghost" style={{flex:1}} onClick={()=>setEmailModal(false)}>Cancelar</button><button className="btn" style={{flex:1,background:'#1d4ed8',color:'white'}} onClick={()=>{const sub=encodeURIComponent(`[EBF Constitución] Resumen Operacional — ${op.nombre||'Incidente'} ${op.fecha}`);const body=encodeURIComponent(`RESUMEN OPERACIONAL EBF CONSTITUCIÓN\n=====================================\nIncidente: ${op.nombre||'—'}  N°: ${op.numero||'—'}\nFecha: ${op.fecha}  Hora: ${op.hora}\n\nTIPO DE INCENDIO: ${(op.tipo_iiff||[]).join(', ')||'—'}\nLUGAR: ${(op.lugar||[]).join(', ')||'—'}\nMOTOR: ${(op.motor||[]).join(', ')||'—'}\nAMENAZAS: ${(op.amenazas||[]).join(', ')||'—'}\nOBJETIVOS: ${op.objetivos||'—'}\nCOMBATE: ${[op.met_directo&&'Directo',op.met_indirecto&&'Indirecto',op.met_combinado&&'Combinado'].filter(Boolean).join(' + ')||'—'}\nSOLICITUD DE RECURSOS: ${op.solicitud_recursos?'SÍ'+((op.solicitud_lista||[]).length?' · '+op.solicitud_lista.join(', '):''):'NO'}\n\nFASE: ${op.fase||'—'}${op.contenido_pct?' '+op.contenido_pct+'%':''}\nACCIÓN: ${(op.accion||[]).join(', ')||'—'}\nMANDO SCI: ${op.forma_mando||'—'}\nPC: ${op.pc_lugar||'—'}\nÁREA ESPERA: ${op.are_lugar||'—'}\nPAP: ${op.pap_lugar||'—'}\n\nSITUACIÓN AL TRASPASO\nEn camino: ${op.recursos_camino||'—'}\nAsignados: ${op.recursos_asignados||'—'}\nDisponibles: ${op.recursos_disponibles||'—'}\nAvance: ${op.avance_pct?op.avance_pct+'%':'—'}\nProyección: ${op.proyeccion_objetivo||'—'}\nTiempo para el control: ${op.tiempo_control||'—'}\n\nTRASPASO DE MANDO\nEntrega: ${op.mando_entrega||'—'}\nRecibe: ${op.mando_recibe||'—'}\n\nEBF Constitución — ${new Date().toLocaleString('es-CL')}`);window.location.href=`mailto:${emailDest}?subject=${sub}&body=${body}`;setEmailModal(false);}}>📧 Abrir correo</button></div>
       </div></div>}
     <div className="hdr">
       <button className="hdr-back" onClick={cerrar}>←</button>
